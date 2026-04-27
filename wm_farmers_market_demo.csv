@@ -1,0 +1,10 @@
+market_date,vendor_name,category,reported_sales,token_reimbursement,sales_reported,paid_amount,attended,weather,count_830,count_930,count_1030,count_1130
+2026-04-05,Green Garden Farm,Produce,500.00,20.00,1,31.20,1,Sunny,0,0,0,0
+2026-04-05,Colonial Bakes,Baked Goods,250.00,0.00,1,0.00,1,Sunny,0,0,0,0
+2026-04-05,River City Tacos,Prepared Foods,0.00,0.00,0,0.00,1,Sunny,0,0,0,0
+2026-04-12,Green Garden Farm,Produce,610.00,30.00,1,38.40,1,Cloudy,0,0,0,0
+2026-04-12,Colonial Bakes,Baked Goods,280.00,0.00,1,16.80,1,Cloudy,0,0,0,0
+2026-04-12,Hearthside Meats,Meat,390.00,20.00,1,24.60,1,Cloudy,0,0,0,0
+2026-04-19,Green Garden Farm,Produce,560.00,30.00,1,35.40,1,Rainy,0,0,0,0
+2026-04-19,River City Tacos,Prepared Foods,450.00,25.00,1,0.00,1,Rainy,0,0,0,0
+2026-04-19,Campus Crafts,Other,125.00,0.00,1,7.50,1,Rainy,0,0,0,0
