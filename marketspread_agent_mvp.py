@@ -99,8 +99,7 @@ h1, h2, h3 {
 
 SALES_FEE_RATE = 0.06
 
-st.title("William & Mary Farmers Market Dashboard")
-st.caption("Agentic AI operations dashboard demo for farmers market management.")
+
 
 vendor_data = pd.read_csv("marketspread_vendor_data.csv")
 market_data = pd.read_csv("marketspread_market_day_data.csv")
