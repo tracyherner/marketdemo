@@ -61,3 +61,6 @@ if "weather_descriptor" in market_data.columns:
     st.write(weather_summary)
 
     st.caption("Insight: Compare attendance across weather conditions to guide programming and vendor mix.")
+    st.header("Next Market Planning")
+
+st.write("This section will identify upcoming vendors, expected attendance, weather context, and at-risk vendors for the next market.")
