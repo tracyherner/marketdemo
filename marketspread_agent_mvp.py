@@ -64,3 +64,31 @@ if "weather_descriptor" in market_data.columns:
     st.header("Next Market Planning")
 
 st.write("This section will identify upcoming vendors, expected attendance, weather context, and at-risk vendors for the next market.")
+
+st.header("Next Market Planning")
+
+# Simulated upcoming market inputs (you can make this dynamic later)
+expected_vendors = len(vendor_data["vendor_name"].unique())
+
+# Simple weather assumption (replace later with real API if you want)
+weather_outlook = "Sunny"
+
+# Attendance expectation logic
+if expected_vendors > 25 and weather_outlook == "Sunny":
+    expected_attendance = "1,000+"
+else:
+    expected_attendance = "Moderate"
+
+st.metric("Expected Vendors", expected_vendors)
+st.metric("Weather Outlook", weather_outlook)
+st.metric("Expected Attendance", expected_attendance)
+
+st.caption("Insight: Vendor count and weather conditions drive expected attendance. High vendor volume + good weather suggests a strong market day.")
+
+# At-risk vendors (reuse logic)
+low_sales = vendor_data[vendor_data["sales"] < vendor_data["sales"].mean()]
+
+if not low_sales.empty:
+    st.subheader("Vendors to Support This Week")
+    st.write("These vendors may benefit from marketing or placement support:")
+    st.dataframe(low_sales[["vendor_name", "sales"]])
