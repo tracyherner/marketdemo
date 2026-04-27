@@ -43,6 +43,41 @@ h1, h2, h3 {
     padding-top: 2rem;
     padding-bottom: 2rem;
 }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown(
+    "<h1 style='color:#115740;'>William & Mary Farmers Market Dashboard</h1>",
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    "<p style='color:#115740; font-weight:600;'>Agentic AI operations dashboard for market management</p>",
+    unsafe_allow_html=True
+)
+
+
+st.markdown("""
+<style>
+.main {
+    background-color: #F7F4EA;
+}
+
+h1, h2, h3 {
+    color: #115740;
+}
+
+[data-testid="stMetric"] {
+    background-color: white;
+    border: 1px solid #C99700;
+    padding: 18px;
+    border-radius: 14px;
+}
+
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
 
 .wm-card {
     background-color: white;
