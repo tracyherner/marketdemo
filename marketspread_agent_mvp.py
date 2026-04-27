@@ -1,3 +1,16 @@
 import streamlit as st
+import pandas as pd
 
-st.title("It works 🎉")
+st.title("William & Mary Farmers Market Dashboard")
+
+st.success("App is running 🎉")
+
+# Load data
+vendor_data = pd.read_csv("marketspread_vendor_data.csv")
+market_data = pd.read_csv("marketspread_market_day_data.csv")
+
+st.subheader("Vendor Data")
+st.dataframe(vendor_data)
+
+st.subheader("Market Data")
+st.dataframe(market_data)
