@@ -92,3 +92,33 @@ if not low_sales.empty:
     st.subheader("Vendors to Support This Week")
     st.write("These vendors may benefit from marketing or placement support:")
     st.dataframe(low_sales[["vendor_name", "sales"]])
+
+    st.header("Market Assistant")
+
+question = st.text_input("Ask a question about your market data:")
+
+if question:
+    question_lower = question.lower()
+
+    if "sales" in question_lower:
+        total_sales = vendor_data["sales"].sum()
+        st.write(f"Total recorded sales are ${total_sales:,.2f}.")
+
+    elif "attendance" in question_lower:
+        total_attendance = market_data["attendance_total"].sum()
+        st.write(f"Estimated total attendance is {total_attendance:,.0f}.")
+
+    elif "vendors" in question_lower:
+        vendor_count = vendor_data["vendor_name"].nunique()
+        st.write(f"There are {vendor_count} unique vendors in the dataset.")
+
+    elif "at risk" in question_lower or "underperform" in question_lower:
+        low_sales = vendor_data[vendor_data["sales"] < vendor_data["sales"].mean()]
+        if not low_sales.empty:
+            names = ", ".join(low_sales["vendor_name"].unique())
+            st.write(f"These vendors may need support: {names}.")
+        else:
+            st.write("No vendors are currently underperforming.")
+
+    else:
+        st.write("Try asking about sales, attendance, vendors, or at-risk vendors.")
