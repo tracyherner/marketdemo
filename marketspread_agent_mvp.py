@@ -358,3 +358,57 @@ if "vendor_name" in vendor_data.columns:
 
     role_counts = active_role_df["vendor_role"].value_counts()
     st.bar_chart(role_counts)
+
+# ============================================================
+# WEATHER + PERFORMANCE ANALYSIS
+# ============================================================
+# WHY:
+# This connects weather → attendance → sales
+# to support hypothesis-driven decision making.
+
+st.header("Weather + Performance Analysis")
+
+st.caption(
+    "This section analyzes how weather conditions impact both customer attendance "
+    "and vendor sales performance."
+)
+
+if "weather" in market_data.columns:
+
+    weather_summary = market_data.groupby("weather").agg({
+        "attendance_total": "mean"
+    }).reset_index()
+
+    st.subheader("Attendance by Weather")
+    st.dataframe(weather_summary)
+
+    if "sales" in vendor_data.columns:
+        vendor_weather = vendor_data.merge(
+            market_data[["market_date", "weather"]],
+            on="market_date",
+            how="left"
+        )
+
+        sales_summary = vendor_weather.groupby("weather")["sales"].mean().reset_index()
+
+        st.subheader("Average Sales by Weather")
+        st.dataframe(sales_summary)
+
+        st.subheader("Insight")
+
+        if len(sales_summary) >= 2:
+            best = sales_summary.sort_values("sales", ascending=False).iloc[0]
+            worst = sales_summary.sort_values("sales").iloc[0]
+
+            st.write(
+                f"Hypothesis: {best['weather']} conditions drive higher vendor sales "
+                f"(${best['sales']:.2f}) compared to {worst['weather']} "
+                f"(${worst['sales']:.2f})."
+            )
+
+            st.write(
+                "This insight can guide vendor mix, marketing, and programming decisions."
+            )
+
+else:
+    st.info("Weather data not available yet.")
