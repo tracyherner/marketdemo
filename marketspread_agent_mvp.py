@@ -17,6 +17,51 @@ import pandas as pd
 # 5. Supports better decisions about follow-up, marketing, and attendance trends.
 # ============================================================
 
+st.set_page_config(
+    page_title="W&M Farmers Market Dashboard",
+    layout="wide"
+)
+
+st.markdown("""
+<style>
+.main {
+    background-color: #F7F4EA;
+}
+
+h1, h2, h3 {
+    color: #115740;
+}
+
+[data-testid="stMetric"] {
+    background-color: white;
+    border: 1px solid #C99700;
+    padding: 18px;
+    border-radius: 14px;
+}
+
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
+.wm-card {
+    background-color: white;
+    border-left: 6px solid #115740;
+    padding: 18px;
+    border-radius: 14px;
+    margin-bottom: 18px;
+}
+
+.wm-gold-card {
+    background-color: white;
+    border-left: 6px solid #C99700;
+    padding: 18px;
+    border-radius: 14px;
+    margin-bottom: 18px;
+}
+</style>
+""", unsafe_allow_html=True)
+
 SALES_FEE_RATE = 0.06
 
 st.title("William & Mary Farmers Market Dashboard")
