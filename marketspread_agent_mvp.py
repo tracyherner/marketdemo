@@ -246,3 +246,51 @@ def action_needed(row):
 operations_df["action_needed"] = operations_df.apply(action_needed, axis=1)
 
 st.dataframe(operations_df)
+
+# ============================================================
+# DECISION LOOP: ATTENDANCE + PROGRAMMING INSIGHT
+# ============================================================
+# WHY:
+# This section shows the analytics loop:
+# observe attendance by time of day → identify a weak period →
+# recommend programming → measure whether attendance improves.
+
+st.header("Decision Loop: Attendance + Programming")
+
+st.caption(
+    "This section connects timed attendance counts to programming decisions, "
+    "such as adding children's activities during softer traffic windows."
+)
+
+if {"attendance_930", "attendance_1030"}.issubset(market_data.columns):
+    avg_930 = market_data["attendance_930"].mean()
+    avg_1030 = market_data["attendance_1030"].mean()
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Avg. 9:30 Count", f"{avg_930:,.0f}")
+    col2.metric("Avg. 10:30 Count", f"{avg_1030:,.0f}")
+
+    if avg_1030 < avg_930:
+        col3.metric("Pattern", "10–11am Dip")
+        st.warning(
+            "Observed pattern: attendance is softer around the 10:30 count. "
+            "Recommendation: add or promote children’s programming, music, chef demos, "
+            "or other engagement during the 10–11am window."
+        )
+    else:
+        col3.metric("Pattern", "Stable Traffic")
+        st.success(
+            "Attendance does not currently show a clear 10–11am dip, but the market "
+            "should continue tracking this window."
+        )
+
+    st.line_chart(
+        market_data[["attendance_830", "attendance_930", "attendance_1030", "attendance_1130"]]
+    )
+
+else:
+    st.info(
+        "Timed attendance columns are not available yet. "
+        "Expected columns: attendance_830, attendance_930, attendance_1030, attendance_1130."
+    )
