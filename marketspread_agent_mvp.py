@@ -41,3 +41,23 @@ st.dataframe(vendor_data)
 
 st.subheader("Market Data")
 st.dataframe(market_data)
+st.header("Insights")
+
+# At-risk vendors (simple version)
+if "sales" in vendor_data.columns:
+    low_sales = vendor_data[vendor_data["sales"] < vendor_data["sales"].mean()]
+
+    if not low_sales.empty:
+        st.subheader("At-Risk Vendors")
+        st.write("These vendors are performing below average and may need support:")
+        st.dataframe(low_sales[["vendor_name", "sales"]])
+    else:
+        st.success("No at-risk vendors right now")
+
+# Weather + attendance relationship (simple)
+if "weather_descriptor" in market_data.columns:
+    st.subheader("Weather Impact Insight")
+    weather_summary = market_data.groupby("weather_descriptor")["attendance_total"].mean()
+    st.write(weather_summary)
+
+    st.caption("Insight: Compare attendance across weather conditions to guide programming and vendor mix.")
