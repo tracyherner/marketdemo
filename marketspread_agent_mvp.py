@@ -223,3 +223,26 @@ if question:
 
     else:
         st.write("Try asking about sales, attendance, vendors, or at-risk vendors.")
+
+        st.header("Operations Dashboard")
+
+st.caption("Operational tracking of vendor performance, fees, and follow-up actions.")
+
+operations_df = vendor_data.copy()
+
+# Build logic from your original system
+operations_df["total_sales"] = operations_df["sales"] + operations_df.get("token_reimbursement", 0)
+operations_df["fee_due"] = operations_df["total_sales"] * 0.06
+operations_df["balance_due"] = operations_df["fee_due"] - operations_df.get("paid_amount", 0)
+
+def action_needed(row):
+    if row.get("sales", 0) == 0:
+        return "Send sales reminder"
+    elif row.get("paid_amount", 0) < row["fee_due"]:
+        return "Send payment reminder"
+    else:
+        return "Complete"
+
+operations_df["action_needed"] = operations_df.apply(action_needed, axis=1)
+
+st.dataframe(operations_df)
