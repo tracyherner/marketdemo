@@ -1,14 +1,36 @@
-import streamlit as st
-import pandas as pd
-
 # ============================================================
 # WILLIAM & MARY FARMERS MARKET DASHBOARD
-# STREAMLIT DEMO VERSION WITH COMMENTS
+# STREAMLIT VERSION (BASED ON ORIGINAL FULL DEMO)
 # ============================================================
 # PURPOSE:
 # This dashboard demonstrates how agentic AI can replace or improve
 # a fragile spreadsheet process for farmers market operations.
 #
+# ORIGINAL SYSTEM INCLUDED:
+# - Approved vendor controls (prevents bad data entry)
+# - Automated fee calculation (6% rule)
+# - Token reimbursement logic
+# - Attendance estimation using 2.43 multiplier
+# - Vendor performance tracking and benchmarking
+# - Follow-up identification (sales + payment)
+# - Weather + attendance + programming analysis
+# - Decision loop (10–11am traffic dip → programming intervention)
+# - Built-in constrained AI assistant
+#
+# CURRENT VERSION:
+# This Streamlit version preserves the business logic and insights
+# while replacing the local web server with a deployable dashboard.
+#
+# DESIGN PRINCIPLES:
+# - No manual math (everything is calculated)
+# - One source of truth for fee logic
+# - Clean separation between data, logic, and insights
+# ============================================================
+
+import streamlit as st
+import pandas as pd
+
+
 # CORE DEMO STORY:
 # 1. Replaces multi-spreadsheet tracking with one operations dashboard.
 # 2. Tracks vendor sales, 6% fees, attendance, weather, and market context.
