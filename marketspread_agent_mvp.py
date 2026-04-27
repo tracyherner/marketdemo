@@ -294,3 +294,67 @@ else:
         "Timed attendance columns are not available yet. "
         "Expected columns: attendance_830, attendance_930, attendance_1030, attendance_1130."
     )
+
+# ============================================================
+# VENDOR ROLE INTELLIGENCE
+# ============================================================
+# WHY:
+# The manager does not only think about vendors by category.
+# Some vendors are weekly staples, some drive traffic, and some add seasonal variety.
+
+st.header("Vendor Role Intelligence")
+
+vendor_roles = {
+    "Weekly Staples": [
+        "Green Garden Farm", "Berry Patch Produce", "York River Vegetables",
+        "Pure Earth Organics", "Sunny Side Eggs", "Heritage Hen Farm",
+        "Colonial Bakes", "Daily Bread Co", "Hearthside Meats",
+        "Old Dominion Sausage Co"
+    ],
+    "Traffic Drivers": [
+        "Williamsburg Pickles", "Colonial Kettle Corn", "Williamsburg Coffee Co"
+    ],
+    "Seasonal Vendors": [
+        "Williamsburg Pops", "Campus Crafts"
+    ],
+    "Rotating / Biweekly Vendors": [
+        "Pasta Fresca"
+    ],
+    "Specialty Food Vendors": [
+        "Artisan Cheese Co", "Salsa Verde Kitchen", "Spice Route Blends"
+    ],
+    "Pet & Home Vendors": [
+        "Happy Tails Treats", "Goat Milk Soap Co"
+    ],
+}
+
+role_rows = []
+
+for role, vendors in vendor_roles.items():
+    for vendor in vendors:
+        role_rows.append({
+            "vendor_role": role,
+            "vendor_name": vendor
+        })
+
+role_df = pd.DataFrame(role_rows)
+
+st.caption(
+    "This translates the vendor schedule into operational strategy by identifying "
+    "which vendors anchor the market, drive traffic, or add seasonal variety."
+)
+
+st.dataframe(role_df)
+
+if "vendor_name" in vendor_data.columns:
+    active_role_df = role_df.merge(
+        vendor_data[["vendor_name"]].drop_duplicates(),
+        on="vendor_name",
+        how="inner"
+    )
+
+    st.subheader("Active Vendors by Role")
+    st.dataframe(active_role_df)
+
+    role_counts = active_role_df["vendor_role"].value_counts()
+    st.bar_chart(role_counts)
