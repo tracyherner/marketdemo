@@ -1078,8 +1078,8 @@ def upcoming_market_insight(
         )
 
     return (
-        f"Planning insight: {scheduled_vendor_count} vendors are scheduled. Attendance is still below key benchmark thresholds, so turnout may be moderate. "
-        f"and the current attendance signal is {performance_label}."
+    f"Planning insight: {scheduled_vendor_count} vendors are scheduled. "
+    "Attendance is still below key benchmark thresholds, so turnout may be moderate."
     )
 
 
@@ -1374,7 +1374,7 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
 
         names = ", ".join(unique_vendors)
         return (
-            f""There are {len(unique_vendors)} vendor(s) requiring follow-up: {names}. "
+            f"There are {len(unique_vendors)} vendor(s) requiring follow-up: {names}. "
             "This includes missing sales reports, outstanding payments, or both." 
             + audit_note
         )
@@ -1448,7 +1448,7 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
 
         if total_customers > 0:
             return (
-                f""The estimated total customer count is {total_customers}, based on validated market attendance methodology."
+                f"The estimated total customer count is {total_customers}, based on validated market attendance methodology."
                 + audit_note
             )
 
