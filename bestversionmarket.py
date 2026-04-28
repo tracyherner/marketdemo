@@ -1065,21 +1065,28 @@ def upcoming_market_insight(
     WHY: The upcoming market section should not just display raw KPIs. It should explain
     what the forecast and vendor count imply for planning.
     """
+    weather = (weather_text or "").lower()
+
+    # High attendance scenario
     if expected_customers >= 1000:
         return (
             f"Planning insight: With {scheduled_vendor_count} scheduled vendors and favorable weather from {weather_source}, "
-            "the market should plan for a high-attendance day of 1,000+ customers."
+            "the market should plan for a high-attendance day of 1,000+ customers. "
+            "Staffing, vendor readiness, and inventory should be scaled accordingly."
         )
 
-    if "rain" in weather_text.lower() or "wind" in weather_text.lower():
+    # Weather risk scenario
+    if "rain" in weather or "wind" in weather:
         return (
             f"Planning insight: Weather may suppress attendance because the signal is '{weather_text}'. "
-            "Consider extra customer communication, covered programming, and vendor support."
+            "Focus on customer communication, covered programming, and vendor support to maintain performance."
         )
 
+    # Default (most common case — THIS is what you are seeing)
     return (
-    f"Planning insight: {scheduled_vendor_count} vendors are scheduled. "
-    "Attendance is still below key benchmark thresholds, so turnout may be moderate."
+        f"Planning insight: {scheduled_vendor_count} vendors are scheduled. "
+        "Attendance signals are still developing and do not yet indicate a high-volume market. "
+        "Preparation should focus on vendor support, customer communication, and maintaining a strong on-site experience."
     )
 
 
