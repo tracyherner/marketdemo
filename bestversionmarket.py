@@ -1340,7 +1340,7 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
         "upcoming", "next market", "this week", "prepare", "should i"
     ])
 
-    if is_upcoming_question and "weather" not in q and "forecast" not in q::
+    if is_upcoming_question and "weather" not in q and "forecast" not in q:
         schedule = load_schedule()
         context_by_date = market_context_lookup()
 
