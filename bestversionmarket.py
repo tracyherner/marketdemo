@@ -1400,39 +1400,40 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
         return audit_note + analyze_weather_impact(records)
 
     if "customer" in q or "attendance" in q:
-    total_customers = sum(estimate_customers(r) for r in records)
 
-    if total_customers > 0:
-        return (
-            audit_note
-            + f"The estimated total customer count is {total_customers}. "
-            f"This estimate uses the market multiplier of {CUSTOMER_MULTIPLIER} applied to the timed attendance counts."
+    # 🔥 NEW: Use upcoming market context instead of raw vendor records
+    schedule = load_schedule()
+    context_by_date = market_context_lookup()
+
+    if schedule:
+        next_market_date = sorted(schedule.keys())[0]  # simplest next date logic
+        scheduled_vendors = schedule.get(next_market_date, [])
+        vendor_count = len(scheduled_vendors)
+
+        context = context_by_date.get(next_market_date)
+        weather_text = context.weather if context else "Not recorded"
+
+        expected = expected_customer_threshold(vendor_count, weather_text)
+        performance = attendance_performance_label(0, expected)
+
+        insight = upcoming_market_insight(
+            vendor_count,
+            weather_text,
+            "Weather.gov",
+            expected,
+            performance,
         )
 
-    context_records = load_market_day_context()
-    recent_markets = [r for r in context_records if r.estimated_customers > 0]
-
-    if recent_markets:
-        recent_markets = sorted(recent_markets, key=lambda r: r.market_date)[-5:]
-        avg_customers = sum(r.estimated_customers for r in recent_markets) / len(recent_markets)
-        low_customers = min(r.estimated_customers for r in recent_markets)
-        high_customers = max(r.estimated_customers for r in recent_markets)
-
         return (
             audit_note
-            + "No attendance data has been recorded yet for the upcoming market. "
-            "Because this market has not happened yet, I am switching from actual attendance counts "
-            "to recent-market context. "
-            f"Recent markets have ranged from {low_customers:,.0f} to {high_customers:,.0f} estimated customers, "
-            f"with an average of about {avg_customers:,.0f}. "
-            "Vendor participation, weather, and category mix should be watched closely for planning."
+            + f"For the upcoming market on {next_market_date}, there are {vendor_count} scheduled vendors. "
+            + insight
         )
 
+    # fallback if no schedule exists
     return (
         audit_note
-        + "No attendance data has been recorded yet for the upcoming market, "
-        "and there is not enough historical attendance data to calculate a trend. "
-        "Use expected vendor participation, weather, and category mix as planning signals instead of treating the current count as zero."
+        + "No upcoming market schedule is available, so attendance cannot be estimated."
     )
 
     if "sales" in q or "revenue" in q:
