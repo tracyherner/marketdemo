@@ -1796,6 +1796,13 @@ def build_dashboard_html(records: list[VendorRecord], flash_message: str = "", a
     </div>
     </details>
 
+<details class="section-card" id="schedule-section" open>
+      <summary>2. Upcoming Market Overview</summary>
+      <div class="section-body">
+        {build_next_market_schedule_view(schedule_category)}
+      </div>
+    </details>
+    
     <details class="section-card" id="season-view" open>
       <summary>3. Full Season View</summary>
       <div class="section-body">
@@ -1815,13 +1822,6 @@ def build_dashboard_html(records: list[VendorRecord], flash_message: str = "", a
       <div class="section-body">
         <p class="note">This groups vendors by operational role, not just category, so the manager can think about consistency, traffic, seasonality, and variety.</p>
         {build_vendor_roles_view()}
-      </div>
-    </details>
-
-    <details class="section-card" id="schedule-section" open>
-      <summary>2. Upcoming Market Overview</summary>
-      <div class="section-body">
-        {build_next_market_schedule_view(schedule_category)}
       </div>
     </details>
 
