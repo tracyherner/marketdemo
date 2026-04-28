@@ -493,7 +493,7 @@ def create_sample_schedule(file_path: Path = SCHEDULE_FILE) -> None:
     summer_weekly_vendors = ["Williamsburg Pops"]  # Popsicles every week in summer months
     monthly_vendors = ["Jamestown Jams", "Sweet Crumb Cookies", "Spice Route Blends", "Goat Milk Soap Co"]  # soap vendor monthly  # Jam vendor once per month
     other_vendors = ["Hearthside Meats", "Old Dominion Sausage Co"]
-    start_date = date(2026, 5, 2)
+    start_date = date(2026, 4, 11)
     end_date = last_saturday_in_september(2026)
 
     with file_path.open("w", newline="", encoding="utf-8") as file_handle:
