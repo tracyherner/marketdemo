@@ -1305,90 +1305,144 @@ def math_audit_prefix(records: list[VendorRecord]) -> str:
 # ---------- BUILT-IN AGENT: QUESTION ANSWERING ----------
 
 def answer_agent_question(records: list[VendorRecord], question: str) -> str:
-    """Answer approved market-operations questions in full, readable sentences.
+ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
+    """Answer approved market-operations questions in full, readable sentences."""
 
-    WHY: The agent should feel like a business assistant, not a raw data dump.
-
-    CHECK: The math audit runs before every answer. The answer includes the audit note,
-    so the user knows whether the response is based on clean data or flagged data.
-    """
     audit_note = math_audit_prefix(records)
-    # --- Clean question ---
     q = question.lower().strip()
-    # --- Handle empty input ---
+
     if not q:
-        return "Please type a market operations question, such as, 'How many vendors are past due?'" = audit_note
-        
-    # --- Intent detection ---
-    is_upcoming_question = any(word in q for word in [
-    "upcoming", "next market", "this week", "prepare", "should i"
-])
-    if is_upcoming_question:
-    # your upcoming logic
-    return "your upcoming answer..." + audit_note
-    
-    # --- Precompute commonly used data ---
+        return "Please type a market operations question, such as, 'How many vendors are past due?' " + audit_note
+
     underperforming = [r for r in records if r.is_underperforming]
     past_due = [r for r in records if r.action_needed != "Complete"]
     missing_sales = [r for r in records if r.action_needed == "Send sales reminder"]
     payment_due = [r for r in records if r.action_needed == "Send payment reminder"]
 
+    is_upcoming_question = any(word in q for word in [
+        "upcoming", "next market", "this week", "prepare", "should i"
+    ])
+
+    if is_upcoming_question:
+        schedule = load_schedule()
+        context_by_date = market_context_lookup()
+
+        if schedule:
+            next_market_date = sorted(schedule.keys())[0]
+            scheduled_vendors = schedule.get(next_market_date, [])
+            vendor_count = len(scheduled_vendors)
+
+            context = context_by_date.get(next_market_date)
+            weather_text = context.weather if context else "Not recorded"
+
+            expected = expected_customer_threshold(vendor_count, weather_text)
+            performance = attendance_performance_label(0, expected)
+
+            insight = upcoming_market_insight(
+                vendor_count,
+                weather_text,
+                "Weather.gov",
+                expected,
+                performance,
+            )
+
+            return (
+                f"For the upcoming market on {next_market_date}, there are {vendor_count} scheduled vendors. "
+                + insight
+                + " "
+                + audit_note
+            )
+
+        return "No upcoming market schedule is available, so preparation needs cannot be estimated yet. " + audit_note
 
     if "underperform" in q or "below" in q or "not meeting" in q:
-    unique_vendors = sorted({r.vendor_name for r in underperforming})
+        unique_vendors = sorted({r.vendor_name for r in underperforming})
+        if not unique_vendors:
+            return "No vendors are currently below their category performance expectations. " + audit_note
 
-    if not unique_vendors:
-        return "No vendors are currently below their category performance expectations. " + audit_note
+        names = ", ".join(unique_vendors)
+        return (
+            f"There are {len(unique_vendors)} vendor(s) currently below performance expectations: {names}. "
+            "A good next step would be to feature these vendors in the newsletter or on social media to help drive traffic. "
+            + audit_note
+        )
 
-    names = ", ".join(unique_vendors)
-
-    return (
-        f"There are {len(unique_vendors)} vendor(s) currently below performance expectations: {names}. "
-        "A good next step would be to feature these vendors in the newsletter or on social media to help drive traffic. "
-        + audit_note
-    )
-    # --- Follow-up needed ---
     if "past due" in q or "follow up" in q or "follow-up" in q or "need action" in q:
         unique_vendors = sorted({r.vendor_name for r in past_due})
         if not unique_vendors:
-            answer_text = "No vendors are currently past due. All vendor records are complete based on the data available."
-            return answer_text + " " + audit_note
+            return "No vendors are currently past due. All vendor records are complete based on the data available. " + audit_note
+
         names = ", ".join(unique_vendors)
-        answer_text = (
+        return (
             f"There are {len(unique_vendors)} vendor(s) who need follow-up: {names}. "
-    
-            "This may include missing sales reports, unpaid fees, or both."
+            "This may include missing sales reports, unpaid fees, or both. "
+            + audit_note
         )
-        return answer_text + " " + audit_note
-    # --- Missing sales ---
+
     if (
-    "missing" in q
-    or "not reported" in q
-    or "hasn't reported" in q
-    or "has not reported" in q
-    or "didn't report" in q
-    or "did not report" in q
-    or "need to report" in q
-    or "still need to report" in q
-):
+        "missing" in q
+        or "not reported" in q
+        or "hasn't reported" in q
+        or "has not reported" in q
+        or "didn't report" in q
+        or "did not report" in q
+        or "need to report" in q
+        or "still need to report" in q
+    ):
         unique_vendors = sorted({r.vendor_name for r in missing_sales})
         if not unique_vendors:
-            return  "All vendors have reported their sales based on the current records." + audit_note
+            return "All vendors have reported their sales based on the current records. " + audit_note
+
         names = ", ".join(unique_vendors)
-        return f"There are {len(unique_vendors)} vendor(s) who still need to report sales: {names}." + audit_note
-    # --- Payments ---
+        return f"There are {len(unique_vendors)} vendor(s) who still need to report sales: {names}. " + audit_note
+
     if "payment" in q or "paid" in q or "owe" in q or "balance" in q:
         unique_vendors = sorted({r.vendor_name for r in payment_due})
         total_balance = sum(r.balance_due for r in payment_due)
+
         if not unique_vendors:
-            return  "No vendors currently need payment follow-up based on the current records." + audit_note
+            return "No vendors currently need payment follow-up based on the current records. " + audit_note
+
         names = ", ".join(unique_vendors)
         return (
             f"There are {len(unique_vendors)} vendor(s) who need payment follow-up: {names}. "
-            f"The total outstanding balance is {format_currency(total_balance)}."
+            f"The total outstanding balance is {format_currency(total_balance)}. "
             + audit_note
         )
-    # --- Attendance ---
+
+    if "category" in q or "breakdown" in q or "mix" in q:
+        if not records:
+            return "There is no vendor data available yet, so I cannot calculate a category breakdown. " + audit_note
+
+        category_counts = Counter(r.category for r in records)
+        total = sum(category_counts.values()) or 1
+        parts = []
+
+        for category, count in sorted(category_counts.items()):
+            pct = (count / total) * 100
+            parts.append(f"{category}: {count} vendor record(s), or {pct:.1f}% of the current records")
+
+        return "Here is the current vendor category breakdown: " + "; ".join(parts) + ". " + audit_note
+
+    if "top" in q and ("vendor" in q or "selling" in q or "sales" in q):
+        if not records:
+            return "There is no sales data available yet, so I cannot identify a top-selling vendor. " + audit_note
+
+        sales_by_vendor: dict[str, float] = defaultdict(float)
+        for r in records:
+            sales_by_vendor[r.vendor_name] += r.sales
+
+        top_vendor = max(sales_by_vendor, key=sales_by_vendor.get)
+        top_sales = sales_by_vendor[top_vendor]
+
+        return f"The top-selling vendor is {top_vendor}, with total recorded sales of {format_currency(top_sales)}. " + audit_note
+
+    if "decision loop" in q or "children" in q or "programming" in q or ("10" in q and "11" in q):
+        return analyze_decision_loop() + " " + audit_note
+
+    if "weather" in q and ("impact" in q or "affect" in q or "influence" in q):
+        return analyze_weather_impact(records) + " " + audit_note
+
     if "customer" in q or "attendance" in q:
         total_customers = sum(estimate_customers(r) for r in records)
 
@@ -1400,85 +1454,12 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
             )
 
         return "No attendance data has been recorded yet for the upcoming market. " + audit_note
-    if "category" in q or "breakdown" in q or "mix" in q:
-        if not records:
-            return  "There is no vendor data available yet, so I cannot calculate a category breakdown." + audit_note
-        category_counts = Counter(r.category for r in records)
-        total = sum(category_counts.values()) or 1
-        parts = []
-        for category, count in sorted(category_counts.items()):
-            pct = (count / total) * 100
-            parts.append(f"{category}: {count} vendor record(s), or {pct:.1f}% of the current records")
-        return "Here is the current vendor category breakdown: " + "; ".join(parts) + "." + audit_note
-    # --- Sales ---
+
     if "sales" in q or "revenue" in q:
         total_sales = sum(r.sales for r in records)
         return f"Total recorded season sales are {format_currency(total_sales)}. " + audit_note
 
-    # ============================================================
-    # FALLBACK
-    # ============================================================
     return agent_scope_message() + " " + audit_note
-    if "top" in q and ("vendor" in q or "selling" in q or "sales" in q):
-        if not records:
-            return  "There is no sales data available yet, so I cannot identify a top-selling vendor." + audit_note
-        sales_by_vendor: dict[str, float] = defaultdict(float)
-        for r in records:
-            sales_by_vendor[r.vendor_name] += r.sales
-        top_vendor = max(sales_by_vendor, key=sales_by_vendor.get)
-        top_sales = sales_by_vendor[top_vendor]
-        return  f"The top-selling vendor is {top_vendor}, with total recorded sales of {format_currency(top_sales)}." + audit_note
-
-    if "decision loop" in q or "children" in q or "programming" in q or ("10" in q and "11" in q):
-        return  analyze_decision_loop() + audit_note
-
-    if "weather" in q and ("impact" in q or "affect" in q or "influence" in q):
-        return  analyze_weather_impact(records) + audit_note
-
-    if "customer" in q or "attendance" in q:
-
-    # 🔥 NEW: Use upcoming market context instead of raw vendor records
-    schedule = load_schedule()
-    context_by_date = market_context_lookup()
-
-    if schedule:
-        next_market_date = sorted(schedule.keys())[0]  # simplest next date logic
-        scheduled_vendors = schedule.get(next_market_date, [])
-        vendor_count = len(scheduled_vendors)
-
-        context = context_by_date.get(next_market_date)
-        weather_text = context.weather if context else "Not recorded"
-
-        expected = expected_customer_threshold(vendor_count, weather_text)
-        performance = attendance_performance_label(0, expected)
-
-        insight = upcoming_market_insight(
-            vendor_count,
-            weather_text,
-            "Weather.gov",
-            expected,
-            performance,
-        )
-
-        return (
-             f"For the upcoming market on {next_market_date}, there are {vendor_count} scheduled vendors. "
-            + insight
-            + audit_note
-        )
-
-    # fallback if no schedule exists
-    return (
-        + "No upcoming market schedule is available, so attendance cannot be estimated."
-        + audit_note
-    )
-
-    if "sales" in q or "revenue" in q:
-        total_sales = sum(r.sales for r in records)
-        return  f"Total recorded season sales are {format_currency(total_sales)}." + audit_note
-
-    return  agent_scope_message() + audit_note
-
-
 # ---------- MARKETING INSIGHTS ----------
 
 def build_marketing_insights(records: list[VendorRecord]) -> str:
