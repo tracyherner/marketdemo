@@ -1783,7 +1783,7 @@ def build_dashboard_html(records: list[VendorRecord], flash_message: str = "", a
     </div>
 
     <details class="section-card agent-card-feature" id="ask-agent" open>
-      <summary>1. Market Operations Assistant</summary>
+      <summary>Market Operations Assistant</summary>
       <div class="section-body">
       <form method="get" action="/#ask-agent" class="agent-question-form">
         <label>Ask a market-operations question<input name="agent_question" value="{html.escape(agent_question)}" placeholder="How many vendors are past due?"></label>
@@ -1797,28 +1797,28 @@ def build_dashboard_html(records: list[VendorRecord], flash_message: str = "", a
     </details>
 
 <details class="section-card" id="schedule-section" open>
-      <summary>2. Upcoming Market Overview</summary>
+      <summary>Upcoming Market Overview</summary>
       <div class="section-body">
         {build_next_market_schedule_view(schedule_category)}
       </div>
     </details>
     
     <details class="section-card" id="season-view" open>
-      <summary>3. Full Season View</summary>
+      <summary>Full Season View</summary>
       <div class="section-body">
         {build_full_season_view(records)}
       </div>
     </details>
 
     <details class="section-card" open>
-      <summary>4. Decision Loop: Programming Impact</summary>
+      <summary>Decision Loop: Programming Impact</summary>
       <div class="section-body">
         {build_decision_loop_view()}
       </div>
     </details>
 
     <details class="section-card">
-      <summary>5. Vendor Role Intelligence</summary>
+      <summary>Vendor Role Intelligence</summary>
       <div class="section-body">
         <p class="note">This groups vendors by operational role, not just category, so the manager can think about consistency, traffic, seasonality, and variety.</p>
         {build_vendor_roles_view()}
@@ -1826,21 +1826,21 @@ def build_dashboard_html(records: list[VendorRecord], flash_message: str = "", a
     </details>
 
     <details class="section-card" id="market-day-input">
-      <summary>7. Market Day Input</summary>
+      <summary>Market Day Input</summary>
       <div class="section-body">
         {build_market_day_input_view()}
       </div>
     </details>
 
     <details class="section-card" id="admin-vendors">
-      <summary>8. Approved Vendor Admin</summary>
+      <summary>Approved Vendor Admin</summary>
       <div class="section-body">
         {build_vendor_admin_view()}
       </div>
     </details>
 
     <details class="section-card" id="vendor-input">
-      <summary>9. Guided Vendor Input</summary>
+      <summary>Guided Vendor Input</summary>
       <div class="section-body">
       <form method="post" action="/submit_vendor">
         <label>Market Date<input name="market_date" type="date" value="2026-04-19" required></label>
@@ -1857,14 +1857,14 @@ def build_dashboard_html(records: list[VendorRecord], flash_message: str = "", a
     </details>
 
     <details class="section-card" id="operations-table">
-      <summary>10. Operations Tracking Table</summary>
+      <summary>Operations Tracking Table</summary>
       <div class="section-body">
         {build_operations_table(records)}
       </div>
     </details>
 
     <details class="section-card">
-      <summary>11. Built-In AI Action Agent</summary>
+      <summary>Built-In AI Action Agent</summary>
       <div class="section-body">
         <p class="note">The agent groups follow-ups by vendor, so one vendor with multiple issues receives one combined follow-up draft.</p>
         {build_ai_agent_section(records)}
@@ -1872,7 +1872,7 @@ def build_dashboard_html(records: list[VendorRecord], flash_message: str = "", a
     </details>
 
     <details class="section-card" id="marketing-insight">
-      <summary>12. Marketing Insight Section</summary>
+      <summary>Marketing Insight Section</summary>
       <div class="section-body">
         {build_marketing_insights(records)}
       </div>
