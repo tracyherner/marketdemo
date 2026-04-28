@@ -1305,7 +1305,7 @@ def math_audit_prefix(records: list[VendorRecord]) -> str:
 # ---------- BUILT-IN AGENT: QUESTION ANSWERING ----------
 
 def answer_agent_question(records: list[VendorRecord], question: str) -> str:
- def answer_agent_question(records: list[VendorRecord], question: str) -> str:
+ 
     """Answer approved market-operations questions in full, readable sentences."""
 
     audit_note = math_audit_prefix(records)
