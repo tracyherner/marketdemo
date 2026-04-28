@@ -1,6 +1,9 @@
 # William & Mary Farmers Market Dashboard
 
-This repository now uses `bestversionmarket.py` as the working full demo application.
+This repository now preserves two versions:
+
+- `bestversionmarket.py`: the preferred full demo local app with the original dashboard layout and operational logic.
+- `streamlit_app.py`: the shareable Streamlit app target, updated to preserve the core bestversionmarket dashboard experience.
 
 ## Launching the app locally
 
@@ -14,6 +17,12 @@ Then open:
 
 ```text
 http://127.0.0.1:8501
+```
+
+If you want the shareable Streamlit version locally, run:
+
+```bash
+streamlit run streamlit_app.py
 ```
 
 Or visit the hosted Streamlit demo:

@@ -1,27 +1,256 @@
 """
-Streamlit dashboard for the William & Mary Farmers Market.
+Streamlit dashboard version of the William & Mary Farmers Market app.
 
-This app loads market vendor and market-day data from CSV files, calculates
-key KPIs, and displays a polished operations dashboard with role intelligence,
-weather performance analysis, and a simple market assistant question box.
-
-The goal is to keep the code readable and maintainable with comments next
-to every major section, so future users understand what each part does.
+This app preserves the key bestversionmarket.py data model and
+dashboard logic while making the demo shareable through Streamlit.
 """
 
-import streamlit as st
+from __future__ import annotations
+
+from datetime import date
+from pathlib import Path
+
 import pandas as pd
+import streamlit as st
 
-# ---------- PAGE CONFIGURATION ----------
-PAGE_TITLE = "William & Mary Farmers Market Dashboard"
-WM_GREEN = "#115740"
-WM_GOLD = "#C99700"
-SALES_FEE_RATE = 0.06  # The central fee rate used for follow-up and fee calculations.
+DATA_DIR = Path('.')
+VENDOR_FILE = DATA_DIR / 'wm_farmers_market_demo.csv'
+MARKET_DAY_FILE = DATA_DIR / 'market_day_context.csv'
+SCHEDULE_FILE = DATA_DIR / 'vendor_schedule.csv'
+APPROVED_VENDOR_FILE = DATA_DIR / 'approved_vendors.csv'
 
-# Configure the page layout and title for Streamlit.
-st.set_page_config(page_title=PAGE_TITLE, layout="wide")
+PAGE_TITLE = 'William & Mary Farmers Market Dashboard'
+WM_GREEN = '#115740'
+WM_GOLD = '#C99700'
+SALES_FEE_RATE = 0.06
+CUSTOMER_MULTIPLIER = 2.43
+CATEGORY_MINIMUMS = {
+    'Baked Goods': 1000.0,
+    'Prepared Foods': 1000.0,
+}
+VENDOR_ROLE_RULES = {
+    'Weekly Staples': [
+        'Green Garden Farm', 'Berry Patch Produce', 'York River Vegetables',
+        'Pure Earth Organics', 'Sunny Side Eggs', 'Heritage Hen Farm',
+        'Colonial Bakes', 'Daily Bread Co', 'Hearthside Meats',
+        'Old Dominion Sausage Co',
+    ],
+    'Traffic Drivers': [
+        'Williamsburg Pickles', 'Colonial Kettle Corn', 'Williamsburg Coffee Co',
+    ],
+    'Seasonal Vendors': ['Williamsburg Pops', 'Campus Crafts'],
+    'Rotating / Biweekly Vendors': ['Pasta Fresca'],
+    'Specialty Food Vendors': ['Artisan Cheese Co', 'Salsa Verde Kitchen', 'Spice Route Blends'],
+    'Pet & Home Vendors': ['Happy Tails Treats', 'Goat Milk Soap Co'],
+}
 
-# Apply custom CSS styling for cards, metrics, and the assistant response.
+
+def parse_bool(value: object) -> bool:
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+
+
+def format_currency(value: float) -> str:
+    return f'${value:,.2f}'
+
+
+def estimate_attendance_from_counts(row: pd.Series) -> int:
+    counts = [row.get('count_830', 0), row.get('count_930', 0), row.get('count_1030', 0), row.get('count_1130', 0)]
+    valid = [float(c) for c in counts if pd.notna(c) and float(c) > 0]
+    if not valid:
+        return 0
+    return int(sum(valid) / len(valid) * CUSTOMER_MULTIPLIER)
+
+
+def load_csv(path: Path, **kwargs) -> pd.DataFrame:
+    if not path.exists():
+        return pd.DataFrame()
+    return pd.read_csv(path, **kwargs)
+
+
+def load_vendor_data() -> pd.DataFrame:
+    df = load_csv(VENDOR_FILE)
+    if df.empty:
+        return df
+
+    numeric_cols = [
+        'reported_sales', 'token_reimbursement', 'paid_amount',
+        'count_830', 'count_930', 'count_1030', 'count_1130',
+    ]
+    for col in numeric_cols:
+        df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0.0)
+
+    df['sales_reported'] = df['sales_reported'].apply(parse_bool)
+    df['attended'] = df['attended'].apply(parse_bool)
+    df['total_sales'] = (df['reported_sales'] + df['token_reimbursement']).round(2)
+    df['fee_due'] = df.apply(lambda row: round(row['total_sales'] * SALES_FEE_RATE, 2) if row['sales_reported'] else 0.0, axis=1)
+    df['paid'] = df.apply(lambda row: bool(row['sales_reported'] and row['paid_amount'] >= row['fee_due']), axis=1)
+    df['balance_due'] = df.apply(lambda row: max(row['fee_due'] - row['paid_amount'], 0.0) if row['sales_reported'] else 0.0, axis=1)
+    df['token_net'] = (df['token_reimbursement'] * (1 - SALES_FEE_RATE)).round(2)
+
+    def underperforming(row: pd.Series) -> bool:
+        minimum = CATEGORY_MINIMUMS.get(row['category'])
+        return bool(minimum is not None and row['total_sales'] < minimum)
+
+    df['underperforming'] = df.apply(underperforming, axis=1)
+
+    def action_needed(row: pd.Series) -> str:
+        if not row['sales_reported']:
+            return 'Send sales reminder'
+        if not row['paid']:
+            return 'Send payment reminder'
+        return 'Complete'
+
+    df['action_needed'] = df.apply(action_needed, axis=1)
+    return df
+
+
+def load_market_day_context() -> pd.DataFrame:
+    df = load_csv(MARKET_DAY_FILE)
+    if df.empty:
+        return df
+
+    count_cols = ['count_830', 'count_930', 'count_1030', 'count_1130']
+    for col in count_cols:
+        df[col] = pd.to_numeric(df.get(col, 0), errors='coerce').fillna(0.0)
+
+    df['estimated_attendance'] = df.apply(estimate_attendance_from_counts, axis=1)
+    return df
+
+
+def load_schedule() -> pd.DataFrame:
+    df = load_csv(SCHEDULE_FILE)
+    if df.empty:
+        return df
+    return df
+
+
+def load_approved_vendors() -> pd.DataFrame:
+    df = load_csv(APPROVED_VENDOR_FILE)
+    if df.empty:
+        return pd.DataFrame(columns=['vendor_name', 'category'])
+    return df
+
+
+def vendor_role_for(vendor_name: str) -> str:
+    for role, names in VENDOR_ROLE_RULES.items():
+        if vendor_name in names:
+            return role
+    return 'Other Vendors'
+
+
+def answer_question(question: str, vendor_df: pd.DataFrame, market_df: pd.DataFrame) -> str:
+    q = str(question).strip().lower()
+    if not q:
+        return ''
+
+    name_lists = {
+        'follow' : vendor_df.loc[~vendor_df['paid'], 'vendor_name'].unique(),
+        'underperform': vendor_df.loc[vendor_df['underperforming'], 'vendor_name'].unique(),
+    }
+
+    if any(term in q for term in ['past due', 'follow up', 'need action']):
+        vendors = sorted(name_lists['follow'])
+        if vendors:
+            return f"There are {len(vendors)} vendor(s) needing follow-up: {', '.join(vendors)}."
+        return 'No vendor follow-up actions are required at the moment.'
+
+    if any(term in q for term in ['at risk', 'underperform', 'below target']):
+        vendors = sorted(name_lists['underperform'])
+        if vendors:
+            return f"These vendors may need support: {', '.join(vendors)}."
+        return 'No vendors are currently underperforming against category expectations.'
+
+    if 'sales' in q:
+        total_sales = vendor_df['total_sales'].sum()
+        return f'Total recorded sales are {format_currency(total_sales)}.'
+
+    if 'attendance' in q:
+        total_attendance = int(market_df['estimated_attendance'].sum())
+        return f'Total estimated attendance is {total_attendance}.'
+
+    if 'vendor' in q or 'vendors' in q:
+        return f"There are {vendor_df['vendor_name'].nunique()} unique vendors in the dataset."
+
+    return 'Try asking about past due vendors, at-risk vendors, sales, attendance, or vendor count.'
+
+
+def build_followup_email(vendor_name: str, vendor_df: pd.DataFrame) -> str:
+    rows = vendor_df[vendor_df['vendor_name'] == vendor_name]
+    if rows.empty:
+        return ''
+
+    total_sales = rows['total_sales'].sum()
+    balance = rows['balance_due'].sum()
+    missing = rows.loc[~rows['sales_reported'], 'market_date'].tolist()
+    unpaid = rows.loc[rows['sales_reported'] & ~rows['paid'], 'market_date'].tolist()
+    lines = [
+        f'Hello {vendor_name},',
+        '',
+        'This is a quick summary of your recent market records:',
+        f'- Reported sales total: {format_currency(total_sales)}',
+        f'- Balance due: {format_currency(balance)}',
+    ]
+    if missing:
+        lines.append(f'- Missing sales report for: {", ".join(missing)}')
+    if unpaid:
+        lines.append(f'- Outstanding payment items for: {", ".join(unpaid)}')
+    if not missing and not unpaid:
+        lines.append('- All records appear complete and paid.')
+    lines += ['', 'Please let us know if you need help with your next market.']
+    return '\n'.join(lines)
+
+
+def build_role_table() -> pd.DataFrame:
+    rows = []
+    for role, names in VENDOR_ROLE_RULES.items():
+        for name in names:
+            rows.append({'Vendor Role': role, 'Vendor': name})
+    return pd.DataFrame(rows)
+
+
+def format_event_summary(row: pd.Series) -> str:
+    details = [
+        row.get('music_event', ''),
+        row.get('chefs_tent', ''),
+        row.get('childrens_programming', ''),
+        row.get('community_events', ''),
+        row.get('nonprofit_orgs', ''),
+    ]
+    return ' | '.join([item for item in details if item])
+
+
+def build_schedule_summary(schedule_df: pd.DataFrame, market_df: pd.DataFrame) -> pd.DataFrame:
+    if schedule_df.empty:
+        return pd.DataFrame()
+
+    summary = []
+    for market_date, group in schedule_df.groupby('market_date'):
+        scheduled_vendors = sorted(group['vendor_name'].dropna().unique())
+        actual_vendors = sorted(
+            vendor_df.loc[vendor_df['market_date'] == market_date, 'vendor_name'].dropna().unique()
+        )
+        missing = sorted(set(scheduled_vendors) - set(actual_vendors))
+        estimated_attendance = 0
+        day_info = market_df.loc[market_df['market_date'] == market_date]
+        if not day_info.empty:
+            estimated_attendance = int(day_info['estimated_attendance'].iloc[0])
+
+        summary.append({
+            'market_date': market_date,
+            'scheduled_vendors': len(scheduled_vendors),
+            'reported_vendors': len(actual_vendors),
+            'missing_vendors': len(missing),
+            'estimated_attendance': estimated_attendance,
+            'missing_names': ', '.join(missing),
+        })
+
+    return pd.DataFrame(summary)
+
+
+st.set_page_config(page_title=PAGE_TITLE, layout='wide')
+
 st.markdown(
     f"""
     <style>
@@ -43,194 +272,133 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Top title card with a short explanation of the dashboard.
-st.markdown(
-    f"<div class='dashboard-card'><h1>{PAGE_TITLE}</h1><p class='note'>A polished market operations dashboard for vendor follow-up, fee tracking, and attendance analysis.</p></div>",
-    unsafe_allow_html=True,
-)
+st.markdown(f"<div class='dashboard-card'><h1>{PAGE_TITLE}</h1><p class='note'>A Streamlit-ready version of the full market operations dashboard.</p></div>", unsafe_allow_html=True)
 
-# ---------- DATA LOADING ----------
-try:
-    # Load the vendor-level and market-level CSV data used throughout the dashboard.
-    vendor_data = pd.read_csv("marketspread_vendor_data.csv")
-    market_data = pd.read_csv("marketspread_market_day_data.csv")
-except FileNotFoundError as exc:
-    # If the CSV files are missing, show an error and stop the app.
-    st.error(f"Missing data file: {exc.filename}")
+vendor_df = load_vendor_data()
+market_df = load_market_day_context()
+schedule_df = load_schedule()
+approved_vendors_df = load_approved_vendors()
+
+missing_files = [
+    f.name for f in [VENDOR_FILE, MARKET_DAY_FILE, SCHEDULE_FILE, APPROVED_VENDOR_FILE] if not f.exists()
+]
+if missing_files:
+    st.error(f"Missing data files: {', '.join(missing_files)}")
     st.stop()
 
-# ---------- CORE CALCULATIONS ----------
-# Convert boolean-like columns to integers for consistent filtering.
-vendor_data["sales_reported"] = vendor_data["sales_reported"].astype(int)
-vendor_data["attended"] = vendor_data["attended"].astype(int)
+if vendor_df.empty or market_df.empty:
+    st.error('Vendor or market-day data is missing or could not be loaded.')
+    st.stop()
 
-# Total season sales from the vendor dataset.
-total_sales = vendor_data["sales"].sum()
+market_df['event_summary'] = market_df.apply(format_event_summary, axis=1)
+market_df['attendance_total'] = market_df['estimated_attendance']
 
-# Estimated vendor fees based on the 6% fee rule.
-estimated_fees = total_sales * SALES_FEE_RATE
+summary_total_sales = float(vendor_df['total_sales'].sum())
+summary_fees = float(vendor_df['fee_due'].sum())
+summary_attendance = int(market_df['estimated_attendance'].sum())
+summary_vendors = int(vendor_df['vendor_name'].nunique())
+summary_underperforming = int(vendor_df['underperforming'].sum())
+summary_open_followups = int(vendor_df.loc[vendor_df['action_needed'] != 'Complete'].shape[0])
 
-# Total attendance from the market-day dataset.
-total_attendance = market_data["attendance_total"].sum()
+tabs = st.tabs(['Overview', 'Vendor Ops', 'Schedule', 'Admin', 'Raw Data'])
 
-# Number of unique vendors represented in the dataset.
-vendor_count = vendor_data["vendor_name"].nunique()
-
-# Vendors whose sales fall below the dataset average.
-low_sales = vendor_data[vendor_data["sales"] < vendor_data["sales"].mean()]
-
-# Vendors that need follow-up because they either did not report sales or have unpaid fees.
-open_followups = vendor_data[
-    (vendor_data["sales_reported"] == 0)
-    | (vendor_data["paid_amount"] < vendor_data["sales"] * SALES_FEE_RATE)
-]
-
-# ---------- QUICK METRICS ----------
-# Render the main summary cards for the season.
-st.markdown("<div class='dashboard-card'><h2>Quick Metrics</h2>", unsafe_allow_html=True)
-st.markdown("<div class='metric-grid'>", unsafe_allow_html=True)
-for label, value in [
-    ("Total Vendor Sales", f"${total_sales:,.2f}"),
-    ("Estimated 6% Market Fees", f"${estimated_fees:,.2f}"),
-    ("Season-to-Date Attendance", f"{total_attendance:,.0f}"),
-    ("Unique Vendors", str(vendor_count)),
-    ("Underperforming Vendors", str(low_sales["vendor_name"].nunique())),
-    ("Open Follow-Ups", str(len(open_followups))),
-]:
-    st.markdown(
-        f"<div class='metric-card'><div class='metric-label'>{label}</div><div class='metric-value'>{value}</div></div>",
-        unsafe_allow_html=True,
-    )
-st.markdown("</div></div>", unsafe_allow_html=True)
-
-# ---------- MARKET ASSISTANT ----------
-# Simple keyword-based assistant for common market questions.
-question = st.text_input("Ask a question about your market data:")
-if question:
-    q = question.lower()
-    answer = None
-
-    if any(term in q for term in ["past due", "follow up", "follow-up", "need action"]):
-        # If there are open follow-up cases, list the vendor names.
-        if not open_followups.empty:
-            names = ", ".join(sorted(open_followups["vendor_name"].dropna().unique()))
-            answer = (
-                f"There are {open_followups['vendor_name'].nunique()} vendor(s) needing follow-up: {names}. "
-                "This includes missing reports or unpaid fees."
-            )
-        else:
-            answer = "No vendors are currently past due. All records look complete."
-
-    elif any(term in q for term in ["at risk", "underperform", "below target"]):
-        # If vendors are underperforming relative to average sales, list them.
-        if not low_sales.empty:
-            names = ", ".join(sorted(low_sales["vendor_name"].dropna().unique()))
-            answer = f"These vendors may need support: {names}."
-        else:
-            answer = "No vendors are currently underperforming."
-
-    elif "sales" in q:
-        answer = f"Total recorded sales are ${total_sales:,.2f}."
-
-    elif "attendance" in q:
-        answer = f"Total estimated attendance is {total_attendance:,.0f}."
-
-    elif "vendor" in q or "vendors" in q:
-        answer = f"There are {vendor_count} unique vendors in the dataset."
-
-    else:
-        answer = "Try asking about past due vendors, at-risk vendors, sales, attendance, or vendor count."
-
-    # Show the assistant response in a highlighted panel.
-    st.markdown(f"<div class='agent-answer'>{answer}</div>", unsafe_allow_html=True)
-
-# ---------- VENDOR ROLE INTELLIGENCE ----------
-# Show how vendors are grouped by their operational role.
-st.markdown("<div class='dashboard-card gold'><h2>Vendor Role Intelligence</h2>", unsafe_allow_html=True)
-vendor_roles = {
-    "Weekly Staples": [
-        "Green Garden Farm", "Berry Patch Produce", "York River Vegetables",
-        "Pure Earth Organics", "Sunny Side Eggs", "Heritage Hen Farm",
-        "Colonial Bakes", "Daily Bread Co", "Hearthside Meats",
-        "Old Dominion Sausage Co",
-    ],
-    "Traffic Drivers": [
-        "Williamsburg Pickles", "Colonial Kettle Corn", "Williamsburg Coffee Co",
-    ],
-    "Seasonal Vendors": ["Williamsburg Pops", "Campus Crafts"],
-    "Rotating / Biweekly Vendors": ["Pasta Fresca"],
-    "Specialty Food Vendors": ["Artisan Cheese Co", "Salsa Verde Kitchen", "Spice Route Blends"],
-    "Pet & Home Vendors": ["Happy Tails Treats", "Goat Milk Soap Co"],
-}
-role_rows = []
-for role, vendors in vendor_roles.items():
-    for vendor in vendors:
-        # Add one row per vendor for the table display.
-        role_rows.append({"Role": role, "Vendor": vendor})
-role_df = pd.DataFrame(role_rows)
-st.dataframe(role_df)
-st.markdown("</div>", unsafe_allow_html=True)
-
-# ---------- WEATHER + PERFORMANCE ANALYSIS ----------
-# Compare attendance and sales across weather conditions.
-st.markdown("<div class='dashboard-card'><h2>Weather + Performance Analysis</h2>", unsafe_allow_html=True)
-if "weather_descriptor" in market_data.columns:
-    # Average attendance by weather condition.
-    weather_summary = market_data.groupby("weather_descriptor")["attendance_total"].mean().reset_index()
-    st.subheader("Attendance by Weather")
-    st.dataframe(weather_summary)
-
-    if "sales" in vendor_data.columns:
-        # Merge vendor sales with weather details from market data.
-        vendor_weather = vendor_data.merge(
-            market_data[["market_date", "weather_descriptor"]],
-            on="market_date",
-            how="left",
+with tabs[0]:
+    st.markdown("<div class='dashboard-card'><h2>Quick Metrics</h2>", unsafe_allow_html=True)
+    st.markdown("<div class='metric-grid'>", unsafe_allow_html=True)
+    for label, value in [
+        ('Total Vendor Sales', format_currency(summary_total_sales)),
+        ('Estimated 6% Fees', format_currency(summary_fees)),
+        ('Season-to-Date Attendance', f'{summary_attendance:,}'),
+        ('Unique Vendors', f'{summary_vendors:,}'),
+        ('Underperforming Vendors', f'{summary_underperforming:,}'),
+        ('Open Follow-Ups', f'{summary_open_followups:,}'),
+    ]:
+        st.markdown(
+            f"<div class='metric-card'><div class='metric-label'>{label}</div><div class='metric-value'>{value}</div></div>",
+            unsafe_allow_html=True,
         )
-        sales_summary = vendor_weather.groupby("weather_descriptor")["sales"].mean().reset_index()
-        st.subheader("Average Sales by Weather")
-        st.dataframe(sales_summary)
+    st.markdown('</div></div>', unsafe_allow_html=True)
 
-        if len(sales_summary) >= 2:
-            # Show a simple observation about the best and worst weather types.
-            best = sales_summary.sort_values("sales", ascending=False).iloc[0]
-            worst = sales_summary.sort_values("sales", ascending=True).iloc[0]
-            st.write(
-                f"Hypothesis: {best['weather_descriptor']} conditions drive higher vendor sales ($"
-                f"{best['sales']:.2f}) than {worst['weather_descriptor']} ($"
-                f"{worst['sales']:.2f})."
-            )
-else:
-    # If weather data is not available, show an info message.
-    st.info("Weather data is not available in the current market dataset.")
-st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("<div class='dashboard-card gold'><h2>Manager Summary</h2>", unsafe_allow_html=True)
+    bullets = [
+        f'Total recorded sales are {format_currency(summary_total_sales)}.',
+        f'Estimated market fees are {format_currency(summary_fees)}.',
+        f'Estimated season attendance is {summary_attendance:,}.',
+    ]
+    if summary_underperforming:
+        bullets.append(f'{summary_underperforming} vendor(s) are below category expectations.')
+    if summary_open_followups:
+        bullets.append(f'{summary_open_followups} record(s) need follow-up action.')
+    else:
+        bullets.append('All vendor records appear complete.')
 
-# ---------- MANAGER SUMMARY ----------
-# Create a concise, manager-friendly readout of the dashboard findings.
-st.markdown("<div class='dashboard-card gold'><h2>Manager Summary</h2>", unsafe_allow_html=True)
-summary_points = [
-    f"Total recorded vendor sales are ${total_sales:,.2f}.",
-    f"Estimated 6% market fees are ${estimated_fees:,.2f}.",
-    f"Season-to-date attendance is {total_attendance:,.0f}.",
-]
-if not low_sales.empty:
-    summary_points.append(
-        f"{low_sales['vendor_name'].nunique()} vendor(s) may need sales or marketing support."
-    )
-if not open_followups.empty:
-    summary_points.append(f"{len(open_followups)} vendor record(s) need follow-up.")
-else:
-    summary_points.append("All vendor records appear complete.")
+    st.markdown('<ul class="summary-list">', unsafe_allow_html=True)
+    for item in bullets:
+        st.markdown(f'<li>{item}</li>', unsafe_allow_html=True)
+    st.markdown('</ul></div>', unsafe_allow_html=True)
 
-st.markdown("<ul class='summary-list'>", unsafe_allow_html=True)
-for point in summary_points:
-    st.markdown(f"<li>{point}</li>", unsafe_allow_html=True)
-st.markdown("</ul>", unsafe_allow_html=True)
-st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("<div class='dashboard-card'><h2>Weather & Attendance</h2></div>", unsafe_allow_html=True)
+    if 'weather' in market_df.columns:
+        with st.expander('Weather summary and attendance by market day'):
+            st.dataframe(market_df[['market_date', 'weather', 'estimated_attendance', 'event_summary']].sort_values('market_date'))
+            if not market_df['weather'].isna().all():
+                weather_groups = market_df.groupby('weather')['estimated_attendance'].mean().reset_index()
+                st.bar_chart(weather_groups.set_index('weather')['estimated_attendance'])
+    else:
+        st.info('No weather data is available in the market-day context file.')
 
-# ---------- RAW DATA ----------
-# Allow users to expand and inspect the raw input files.
-with st.expander("Show Raw Vendor Data"):
-    st.dataframe(vendor_data)
-with st.expander("Show Raw Market Data"):
-    st.dataframe(market_data)
+    question = st.text_input('Ask a question about this market data:')
+    if question:
+        answer = answer_question(question, vendor_df, market_df)
+        st.markdown(f"<div class='agent-answer'>{answer}</div>", unsafe_allow_html=True)
+
+with tabs[1]:
+    st.markdown("<div class='dashboard-card gold'><h2>Vendor Operations</h2></div>", unsafe_allow_html=True)
+    action_df = vendor_df.copy()
+    display_cols = [
+        'market_date', 'vendor_name', 'category', 'total_sales', 'token_reimbursement',
+        'token_net', 'fee_due', 'paid_amount', 'balance_due', 'action_needed', 'sales_reported', 'paid', 'underperforming',
+    ]
+    st.dataframe(action_df[display_cols].sort_values(['market_date', 'vendor_name']))
+
+    if summary_open_followups:
+        st.subheader('Follow-up vendors')
+        followups = action_df[action_df['action_needed'] != 'Complete']
+        st.dataframe(followups[['market_date', 'vendor_name', 'action_needed', 'balance_due', 'fee_due']])
+        selected_vendor = st.selectbox('Select a vendor to view a follow-up email', sorted(followups['vendor_name'].unique()))
+        if selected_vendor:
+            st.code(build_followup_email(selected_vendor, action_df), language='text')
+    else:
+        st.success('No follow-up vendors currently require action.')
+
+    st.markdown("<div class='dashboard-card'><h2>Vendor Role Intelligence</h2></div>", unsafe_allow_html=True)
+    st.dataframe(build_role_table())
+
+with tabs[2]:
+    st.markdown("<div class='dashboard-card gold'><h2>Schedule & Attendance</h2></div>", unsafe_allow_html=True)
+    if not schedule_df.empty:
+        schedule_summary = build_schedule_summary(schedule_df, market_df)
+        st.dataframe(schedule_summary.sort_values('market_date'))
+    else:
+        st.info('No schedule data is available.')
+
+    st.markdown("<div class='dashboard-card'><h2>Market Day Context</h2></div>", unsafe_allow_html=True)
+    st.dataframe(market_df[['market_date', 'weather', 'count_830', 'count_930', 'count_1030', 'count_1130', 'estimated_attendance', 'event_summary']].sort_values('market_date'))
+
+with tabs[3]:
+    st.markdown("<div class='dashboard-card gold'><h2>Admin & Approved Vendors</h2></div>", unsafe_allow_html=True)
+    if not approved_vendors_df.empty:
+        st.dataframe(approved_vendors_df.sort_values('vendor_name'))
+    else:
+        st.info('Approved vendor list is not available.')
+
+with tabs[4]:
+    st.markdown("<div class='dashboard-card'><h2>Raw Data</h2></div>", unsafe_allow_html=True)
+    with st.expander('Vendor data'):
+        st.dataframe(vendor_df)
+    with st.expander('Market day context'):
+        st.dataframe(market_df)
+    with st.expander('Vendor schedule'):
+        st.dataframe(schedule_df)
+    with st.expander('Approved vendors'):
+        st.dataframe(approved_vendors_df)
