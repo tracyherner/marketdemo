@@ -1614,14 +1614,8 @@ def build_schedule_filter_options(selected_category: str = "All") -> str:
 # ---------- NEXT MARKET SCHEDULE VIEW ----------
 
 def next_saturday_from(today: date | None = None) -> date:
-    """Return the next Saturday from today.
-
-    WHY: Section 6 should always focus on the next market date rather than the whole season.
-    """
     today = today or date.today()
     days_until_saturday = (5 - today.weekday()) % 7
-    if days_until_saturday == 0:
-        days_until_saturday = 7
     return today + timedelta(days=days_until_saturday)
 
 
