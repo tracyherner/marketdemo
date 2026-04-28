@@ -1346,7 +1346,16 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
             "This may include missing sales reports, unpaid fees, or both."
         )
 
-    if "missing" in q or "not reported" in q or "need to report" in q or "still need to report" in q:
+    if (
+    "missing" in q
+    or "not reported" in q
+    or "hasn't reported" in q
+    or "has not reported" in q
+    or "didn't report" in q
+    or "did not report" in q
+    or "need to report" in q
+    or "still need to report" in q
+):
         unique_vendors = sorted({r.vendor_name for r in missing_sales})
         if not unique_vendors:
             return audit_note + "All vendors have reported their sales based on the current records."
