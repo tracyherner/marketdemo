@@ -1371,7 +1371,7 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
 
         return "No upcoming market schedule is available, so preparation needs cannot be estimated yet. " + audit_note
 
-        # --- Weather forecast / signal ---
+            # --- Weather forecast / signal ---
     if "forecast" in q or "weather" in q:
         schedule = load_schedule()
 
