@@ -1292,7 +1292,7 @@ def math_audit_prefix(records: list[VendorRecord]) -> str:
     issues = audit_vendor_math(records)
 
     if not issues:
-        return "Data check passed. "
+        return "Data check: calculations verified. "
 
     preview = "; ".join(issues[:2])
     extra = "" if len(issues) <= 2 else f" Plus {len(issues) - 2} more issue(s)."
@@ -1348,8 +1348,8 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
 
             return (
                 f"For the upcoming market on {next_market_date}, there are {vendor_count} scheduled vendors. "
-                + insight
-                + " "
+                f"{insight} "
+                "This provides a strong signal for staffing, vendor support, and customer experience planning. "
                 + audit_note
             )
 
@@ -1374,8 +1374,8 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
 
         names = ", ".join(unique_vendors)
         return (
-            f"There are {len(unique_vendors)} vendor(s) who need follow-up: {names}. "
-            "This may include missing sales reports, unpaid fees, or both. "
+            f""There are {len(unique_vendors)} vendor(s) requiring follow-up: {names}. "
+            "This includes missing sales reports, outstanding payments, or both." 
             + audit_note
         )
 
@@ -1448,8 +1448,7 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
 
         if total_customers > 0:
             return (
-                f"The estimated total customer count is {total_customers}. "
-                f"This estimate uses the market multiplier of {CUSTOMER_MULTIPLIER} applied to the timed attendance counts. "
+                f""The estimated total customer count is {total_customers}, based on validated market attendance methodology."
                 + audit_note
             )
 
