@@ -1369,7 +1369,12 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
             "This includes missing sales reports, outstanding payments, or both." 
             + audit_note
         )
-
+    if "weather" in q or "forecast" in q:
+        return (
+        f"The forecast for the upcoming market is: {weather_text}. "
+        "This may impact attendance and vendor performance. "
+        + audit_note
+    )
     if "report" in q and (
     "missing" in q
     or "not" in q
