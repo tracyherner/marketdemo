@@ -1345,7 +1345,62 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
 
         return "No upcoming market schedule is available, so preparation needs cannot be estimated yet. " + audit_note
         return "No upcoming market schedule is available, so preparation needs cannot be estimated yet. " + audit_note
+        # --- Approved vendors ---
+    if "approved vendor" in q or "approved vendors" in q or "how many vendors are approved" in q:
+        refresh_approved_vendors()
+        approved_count = len(APPROVED_VENDORS)
+        return (
+            f"There are {approved_count} approved vendors in the system. "
+            "This approved vendor list acts as the source of truth for vendor names and categories. "
+            + audit_note
+        )
 
+    # --- Vendor sales performance ---
+    if "performance" in q and ("sales" in q or "vendor" in q or "vendors" in q):
+        if not records:
+            return "There is no vendor sales data available yet. " + audit_note
+
+        sales_by_vendor: dict[str, float] = defaultdict(float)
+        for r in records:
+            sales_by_vendor[r.vendor_name] += r.sales
+
+        sorted_vendors = sorted(sales_by_vendor.items(), key=lambda item: item[1], reverse=True)
+
+        top_vendors = sorted_vendors[:3]
+        bottom_vendors = sorted_vendors[-3:]
+
+        top_text = ", ".join(
+            f"{name} ({format_currency(sales)})" for name, sales in top_vendors
+        )
+
+        bottom_text = ", ".join(
+            f"{name} ({format_currency(sales)})" for name, sales in bottom_vendors
+        )
+
+        return (
+            f"Top sales performers are: {top_text}. "
+            f"Lower sales performers are: {bottom_text}. "
+            "This helps identify which vendors may need marketing support, placement review, or follow-up. "
+            + audit_note
+        )
+
+    # --- Upcoming market weather forecast / signal ---
+    if "forecast" in q or ("weather" in q and "upcoming" in q):
+        schedule = load_schedule()
+        context_by_date = market_context_lookup()
+
+        if schedule:
+            next_market_date = sorted(schedule.keys())[0]
+            context = context_by_date.get(next_market_date)
+            weather_text = context.weather if context else "Not recorded"
+
+            return (
+                f"The weather signal for the upcoming market on {next_market_date} is: {weather_text}. "
+                "This should be considered when planning attendance expectations, vendor support, and customer communication. "
+                + audit_note
+            )
+
+        return "No upcoming market schedule is available, so I cannot identify a weather forecast signal yet. " + audit_note
     if "underperform" in q or "below" in q or "not meeting" in q:
         unique_vendors = sorted({r.vendor_name for r in underperforming})
         if not unique_vendors:
