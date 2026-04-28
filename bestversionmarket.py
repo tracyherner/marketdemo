@@ -1335,7 +1335,7 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
         context_by_date = market_context_lookup()
 
         if schedule:
-            next_market_date = sorted(schedule.keys())[0]
+            next_market_date = get_next_market_from_schedule(schedule).isoformat()
             scheduled_vendors = schedule.get(next_market_date, [])
             vendor_count = len(scheduled_vendors)
 
