@@ -5,7 +5,7 @@ from __future__ import annotations  # Allows cleaner type hints inside the file.
 # FULL DEMO VERSION WITH COMMENTS
 # ============================================================
 # PURPOSE:
-# This local dashboard demonstrates how agentic AI can replace or improve
+# This local dashboard demonstrateas how agentic AI can replace or improve
 # a fragile spreadsheet process for farmers market operations.
 #
 # CORE DEMO STORY:
@@ -1598,20 +1598,25 @@ def build_full_season_view(records: list[VendorRecord]) -> str:
 
 # ---------- SCHEDULE FILTER VIEW ----------
 
+# ---------- SCHEDULE FILTER VIEW ----------
+
 def build_schedule_filter_options(selected_category: str = "All") -> str:
     """Build the category filter dropdown for the schedule section.
 
-    WHY: replaces the separate produce schedule with one flexible schedule view.
+    WHY: Replaces the separate produce schedule with one flexible schedule view.
     """
+    refresh_approved_vendors()
     categories = ["All"] + sorted(set(APPROVED_VENDORS.values()))
     options = []
+
     for category in categories:
         selected = "selected" if category == selected_category else ""
-        options.append(f"<option value='{html.escape(category)}' {selected}>{html.escape(category)}</option>")
+        options.append(
+            f"<option value='{html.escape(category)}' {selected}>{html.escape(category)}</option>"
+        )
+
     return "".join(options)
 
-
-# ---------- NEXT MARKET SCHEDULE VIEW ----------
 
 # ---------- NEXT MARKET SCHEDULE VIEW ----------
 
@@ -1619,16 +1624,23 @@ def get_next_market_from_schedule(schedule: dict[str, list[str]]) -> date:
     """
     Return the next market date that actually exists in the vendor schedule.
 
-    WHY: The dashboard should use the next scheduled market in the data,
-    not just guess the next Saturday.
+    WHY: The dashboard and agent should both use the next scheduled market in the data,
+    not a guessed Saturday and not the first date in the CSV.
     """
     today = date.today()
-    market_dates = sorted(date.fromisoformat(market_date) for market_date in schedule.keys())
+
+    market_dates = sorted(
+        date.fromisoformat(market_date)
+        for market_date in schedule.keys()
+    )
 
     if not market_dates:
         return today
 
-    future_market_dates = [market_date for market_date in market_dates if market_date >= today]
+    future_market_dates = [
+        market_date for market_date in market_dates
+        if market_date >= today
+    ]
 
     if future_market_dates:
         return future_market_dates[0]
@@ -1636,26 +1648,38 @@ def get_next_market_from_schedule(schedule: dict[str, list[str]]) -> date:
     return market_dates[-1]
 
 
-def build_next_market_schedule_view(selected_category: str = "All") -> str:
+def get_upcoming_market_data() -> dict:
     """
-    Build an expandable category schedule for the next scheduled market.
+    Build one shared upcoming-market data package.
 
-    WHY: Managers need a quick view of who is scheduled next, first by total count,
-    then by category with vendor names underneath.
+    WHY: The dashboard and agent should use the same source of truth.
+    This prevents the dashboard from showing one date while the agent answers from another.
     """
+    refresh_approved_vendors()
+
     schedule = load_schedule()
+    context_by_date = market_context_lookup()
+    forecast = fetch_weather_from_weather_gov()
 
     if not schedule:
-        return "<p class='note'>No vendor schedule is available yet.</p>"
+        return {
+            "has_schedule": False,
+            "next_market_key": "",
+            "scheduled_vendors": [],
+            "vendor_count": 0,
+            "market_context": None,
+            "weather_text": "Not recorded",
+            "weather_source": "No schedule available",
+            "actual_customers": 0,
+            "expected_customers": 0,
+            "performance_label": "No benchmark",
+            "planning_insight": "No upcoming market schedule is available yet.",
+        }
 
     next_market = get_next_market_from_schedule(schedule)
     next_market_key = next_market.isoformat()
     scheduled_vendors = schedule.get(next_market_key, [])
-
-    context_by_date = market_context_lookup()
     market_context = context_by_date.get(next_market_key)
-
-    forecast = fetch_weather_from_weather_gov()
 
     if market_context and market_context.weather != "Not recorded":
         weather_text = market_context.weather
@@ -1665,7 +1689,6 @@ def build_next_market_schedule_view(selected_category: str = "All") -> str:
         weather_source = "Weather.gov forecast"
 
     actual_customers = market_context.estimated_customers if market_context else 0
-
     expected_customers = expected_customer_threshold(len(scheduled_vendors), weather_text)
     performance_label = attendance_performance_label(actual_customers, expected_customers)
 
@@ -1677,10 +1700,49 @@ def build_next_market_schedule_view(selected_category: str = "All") -> str:
         performance_label=performance_label,
     )
 
+    return {
+        "has_schedule": True,
+        "next_market_key": next_market_key,
+        "scheduled_vendors": scheduled_vendors,
+        "vendor_count": len(scheduled_vendors),
+        "market_context": market_context,
+        "weather_text": weather_text,
+        "weather_source": weather_source,
+        "forecast": forecast,
+        "actual_customers": actual_customers,
+        "expected_customers": expected_customers,
+        "performance_label": performance_label,
+        "planning_insight": planning_insight,
+    }
+
+
+def build_next_market_schedule_view(selected_category: str = "All") -> str:
+    """
+    Build an expandable category schedule for the next scheduled market.
+
+    WHY: Managers need a quick view of who is scheduled next, first by total count,
+    then by category with vendor names underneath.
+    """
+    upcoming = get_upcoming_market_data()
+
+    if not upcoming["has_schedule"]:
+        return "<p class='note'>No vendor schedule is available yet.</p>"
+
+    next_market_key = upcoming["next_market_key"]
+    scheduled_vendors = upcoming["scheduled_vendors"]
+    weather_text = upcoming["weather_text"]
+    weather_source = upcoming["weather_source"]
+    forecast = upcoming.get("forecast", {})
+    actual_customers = upcoming["actual_customers"]
+    expected_customers = upcoming["expected_customers"]
+    performance_label = upcoming["performance_label"]
+    planning_insight = upcoming["planning_insight"]
+
     vendors_by_category: dict[str, list[str]] = defaultdict(list)
 
     for vendor_name in scheduled_vendors:
         category = APPROVED_VENDORS.get(vendor_name, "Other")
+
         if selected_category == "All" or category == selected_category:
             vendors_by_category[category].append(vendor_name)
 
@@ -1700,7 +1762,9 @@ def build_next_market_schedule_view(selected_category: str = "All") -> str:
         )
 
     if not category_cards:
-        category_cards.append("<p class='note'>No vendors are scheduled for the selected category.</p>")
+        category_cards.append(
+            "<p class='note'>No vendors are scheduled for the selected category.</p>"
+        )
 
     return f"""
     <p class="note"><strong>{html.escape(planning_insight)}</strong></p>
