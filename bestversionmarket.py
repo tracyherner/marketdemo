@@ -1313,29 +1313,37 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
     so the user knows whether the response is based on clean data or flagged data.
     """
     audit_note = math_audit_prefix(records)
+    # --- Clean question ---
     q = question.lower().strip()
+    # --- Handle empty input ---
     if not q:
         answer_text = "Please type a market operations question, such as, 'How many vendors are past due?'"
-        return answer_text + " " + audit_note
-
+        return answer_text + " " 
+    # --- Intent detection ---
+    is_upcoming_question = any(word in q for word in [
+    "upcoming", "next market", "this week", "prepare"
+])
+    # --- Precompute commonly used data ---
     underperforming = [r for r in records if r.is_underperforming]
     past_due = [r for r in records if r.action_needed != "Complete"]
     missing_sales = [r for r in records if r.action_needed == "Send sales reminder"]
     payment_due = [r for r in records if r.action_needed == "Send payment reminder"]
 
-    if "underperform" in q or "below" in q or "not meeting" in q:
-        unique_vendors = sorted({r.vendor_name for r in underperforming})
-        if not unique_vendors:
-            answer_text = "No vendors are currently below their category performance expectations."
-            return answer_text = " " + audit_note
-        names = ", ".join(unique_vendors)
-        return (
-            answer_text = (
-            f"There are {len(unique_vendors)} vendor(s) currently below performance expectations: {names}. "
-            "A good next step would be to feature these vendors in the newsletter or on social media to help drive traffic to their booths."
-        )
-        return answer_text + " " + audit_note
 
+    if "underperform" in q or "below" in q or "not meeting" in q:
+    unique_vendors = sorted({r.vendor_name for r in underperforming})
+
+    if not unique_vendors:
+        return "No vendors are currently below their category performance expectations. " + audit_note
+
+    names = ", ".join(unique_vendors)
+
+    return (
+        f"There are {len(unique_vendors)} vendor(s) currently below performance expectations: {names}. "
+        "A good next step would be to feature these vendors in the newsletter or on social media to help drive traffic. "
+        + audit_note
+    )
+    # --- Follow-up needed ---
     if "past due" in q or "follow up" in q or "follow-up" in q or "need action" in q:
         unique_vendors = sorted({r.vendor_name for r in past_due})
         if not unique_vendors:
@@ -1348,7 +1356,7 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
             "This may include missing sales reports, unpaid fees, or both."
         )
         return answer_text + " " + audit_note
-
+    # --- Missing sales ---
     if (
     "missing" in q
     or "not reported" in q
@@ -1364,7 +1372,7 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
             return  "All vendors have reported their sales based on the current records." + audit_note
         names = ", ".join(unique_vendors)
         return f"There are {len(unique_vendors)} vendor(s) who still need to report sales: {names}." + audit_note
-
+    # --- Payments ---
     if "payment" in q or "paid" in q or "owe" in q or "balance" in q:
         unique_vendors = sorted({r.vendor_name for r in payment_due})
         total_balance = sum(r.balance_due for r in payment_due)
@@ -1376,7 +1384,18 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
             f"The total outstanding balance is {format_currency(total_balance)}."
             + audit_note
         )
+    # --- Attendance ---
+    if "customer" in q or "attendance" in q:
+        total_customers = sum(estimate_customers(r) for r in records)
 
+        if total_customers > 0:
+            return (
+                f"The estimated total customer count is {total_customers}. "
+                f"This estimate uses the market multiplier of {CUSTOMER_MULTIPLIER} applied to the timed attendance counts. "
+                + audit_note
+            )
+
+        return "No attendance data has been recorded yet for the upcoming market. " + audit_note
     if "category" in q or "breakdown" in q or "mix" in q:
         if not records:
             return  "There is no vendor data available yet, so I cannot calculate a category breakdown." + audit_note
@@ -1387,7 +1406,15 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
             pct = (count / total) * 100
             parts.append(f"{category}: {count} vendor record(s), or {pct:.1f}% of the current records")
         return "Here is the current vendor category breakdown: " + "; ".join(parts) + "." + audit_note
+    # --- Sales ---
+    if "sales" in q or "revenue" in q:
+        total_sales = sum(r.sales for r in records)
+        return f"Total recorded season sales are {format_currency(total_sales)}. " + audit_note
 
+    # ============================================================
+    # FALLBACK
+    # ============================================================
+    return agent_scope_message() + " " + audit_note
     if "top" in q and ("vendor" in q or "selling" in q or "sales" in q):
         if not records:
             return  "There is no sales data available yet, so I cannot identify a top-selling vendor." + audit_note
