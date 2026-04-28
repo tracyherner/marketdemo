@@ -2,103 +2,34 @@
 # WILLIAM & MARY FARMERS MARKET DASHBOARD
 # STREAMLIT VERSION (BASED ON ORIGINAL FULL DEMO)
 # ============================================================
-# PURPOSE:
-# This dashboard demonstrates how agentic AI can replace or improve
-# a fragile spreadsheet process for farmers market operations.
-#
-# ORIGINAL SYSTEM INCLUDED:
-# - Approved vendor controls (prevents bad data entry)
-# - Automated fee calculation (6% rule)
-# - Token reimbursement logic
-# - Attendance estimation using 2.43 multiplier
-# - Vendor performance tracking and benchmarking
-# - Follow-up identification (sales + payment)
-# - Weather + attendance + programming analysis
-# - Decision loop (10–11am traffic dip → programming intervention)
-# - Built-in constrained AI assistant
-#
-# CURRENT VERSION:
-# This Streamlit version preserves the business logic and insights
-# while replacing the local web server with a deployable dashboard.
-#
-# DESIGN PRINCIPLES:
-# - No manual math (everything is calculated)
-# - One source of truth for fee logic
-# - Clean separation between data, logic, and insights
-# ============================================================
 
 import streamlit as st
 import pandas as pd
 
-
-# CORE DEMO STORY:
-# 1. Replaces multi-spreadsheet tracking with one operations dashboard.
-# 2. Tracks vendor sales, 6% fees, attendance, weather, and market context.
-# 3. Separates vendor-level data from market-day information.
-# 4. Uses calculated fields instead of manually trusted spreadsheet values.
-# 5. Supports better decisions about follow-up, marketing, and attendance trends.
-# ============================================================
+# ---------- CONFIGURATION ----------
+SALES_FEE_RATE = 0.06
+WM_GREEN = "#115740"
+WM_GOLD = "#C99700"
 
 st.set_page_config(
     page_title="W&M Farmers Market Dashboard",
     layout="wide"
 )
 
+# ---------- W&M STYLE ----------
 st.markdown("""
 <style>
 .main {
     background-color: #F7F4EA;
 }
 
-h1, h2, h3 {
-    color: #115740;
-}
-
-[data-testid="stMetric"] {
-    background-color: white;
-    border: 1px solid #C99700;
-    padding: 18px;
-    border-radius: 14px;
-}
-
 .block-container {
     padding-top: 2rem;
     padding-bottom: 2rem;
 }
-</style>
-""", unsafe_allow_html=True)
-
-st.markdown(
-    "<h1 style='color:#115740;'>William & Mary Farmers Market Dashboard</h1>",
-    unsafe_allow_html=True
-)
-
-st.markdown(
-    "<p style='color:#115740; font-weight:600;'>Agentic AI operations dashboard for market management</p>",
-    unsafe_allow_html=True
-)
-
-
-st.markdown("""
-<style>
-.main {
-    background-color: #F7F4EA;
-}
 
 h1, h2, h3 {
     color: #115740;
-}
-
-[data-testid="stMetric"] {
-    background-color: white;
-    border: 1px solid #C99700;
-    padding: 18px;
-    border-radius: 14px;
-}
-
-.block-container {
-    padding-top: 2rem;
-    padding-bottom: 2rem;
 }
 
 .wm-card {
@@ -116,123 +47,44 @@ h1, h2, h3 {
     border-radius: 14px;
     margin-bottom: 18px;
 }
+
+[data-testid="stMetric"] {
+    background-color: white;
+    border: 1px solid #C99700;
+    padding: 18px;
+    border-radius: 14px;
+}
 </style>
 """, unsafe_allow_html=True)
 
-SALES_FEE_RATE = 0.06
+# ---------- HEADER ----------
+st.markdown(
+    "<h1 style='color:#115740;'>William & Mary Farmers Market Dashboard</h1>",
+    unsafe_allow_html=True
+)
 
+st.markdown(
+    "<p style='color:#115740; font-weight:600;'>Agentic AI operations dashboard for market management</p>",
+    unsafe_allow_html=True
+)
 
-
+# ---------- DATA LOADING ----------
 vendor_data = pd.read_csv("marketspread_vendor_data.csv")
 market_data = pd.read_csv("marketspread_market_day_data.csv")
 
-st.header("Quick Metrics")
-
+# ---------- CORE CALCULATIONS ----------
 total_sales = vendor_data["sales"].sum()
 estimated_fees = total_sales * SALES_FEE_RATE
 total_attendance = market_data["attendance_total"].sum()
+vendor_count = vendor_data["vendor_name"].nunique()
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Total Vendor Sales", f"${total_sales:,.2f}")
-col2.metric("Estimated 6% Market Fees", f"${estimated_fees:,.2f}")
-col3.metric("Season-to-date Attendance", f"{total_attendance:,.0f}")
-
-st.subheader("Vendor Data")
-st.dataframe(vendor_data)
-
-st.subheader("Market Data")
-st.dataframe(market_data)
-st.header("Insights")
-
-# At-risk vendors (simple version)
-if "sales" in vendor_data.columns:
-    low_sales = vendor_data[vendor_data["sales"] < vendor_data["sales"].mean()]
-
-    if not low_sales.empty:
-        st.subheader("At-Risk Vendors")
-        st.write("These vendors are performing below average and may need support:")
-        st.dataframe(low_sales[["vendor_name", "sales"]])
-    else:
-        st.success("No at-risk vendors right now")
-
-# Weather + attendance relationship (simple)
-if "weather_descriptor" in market_data.columns:
-    st.subheader("Weather Impact Insight")
-    weather_summary = market_data.groupby("weather_descriptor")["attendance_total"].mean()
-    st.write(weather_summary)
-
-    st.caption("Insight: Compare attendance across weather conditions to guide programming and vendor mix.")
-    st.header("Next Market Planning")
-
-st.write("This section will identify upcoming vendors, expected attendance, weather context, and at-risk vendors for the next market.")
-
-st.header("Next Market Planning")
-
-# Simulated upcoming market inputs (you can make this dynamic later)
-expected_vendors = len(vendor_data["vendor_name"].unique())
-
-# Simple weather assumption (replace later with real API if you want)
-weather_outlook = "Sunny"
-
-# Attendance expectation logic
-if expected_vendors > 25 and weather_outlook == "Sunny":
-    expected_attendance = "1,000+"
-else:
-    expected_attendance = "Moderate"
-
-st.metric("Expected Vendors", expected_vendors)
-st.metric("Weather Outlook", weather_outlook)
-st.metric("Expected Attendance", expected_attendance)
-
-st.caption("Insight: Vendor count and weather conditions drive expected attendance. High vendor volume + good weather suggests a strong market day.")
-
-# At-risk vendors (reuse logic)
 low_sales = vendor_data[vendor_data["sales"] < vendor_data["sales"].mean()]
 
-if not low_sales.empty:
-    st.subheader("Vendors to Support This Week")
-    st.write("These vendors may benefit from marketing or placement support:")
-    st.dataframe(low_sales[["vendor_name", "sales"]])
-
-    st.header("Market Assistant")
-
-question = st.text_input("Ask a question about your market data:")
-
-if question:
-    question_lower = question.lower()
-
-    if "sales" in question_lower:
-        total_sales = vendor_data["sales"].sum()
-        st.write(f"Total recorded sales are ${total_sales:,.2f}.")
-
-    elif "attendance" in question_lower:
-        total_attendance = market_data["attendance_total"].sum()
-        st.write(f"Estimated total attendance is {total_attendance:,.0f}.")
-
-    elif "vendors" in question_lower:
-        vendor_count = vendor_data["vendor_name"].nunique()
-        st.write(f"There are {vendor_count} unique vendors in the dataset.")
-
-    elif "at risk" in question_lower or "underperform" in question_lower:
-        low_sales = vendor_data[vendor_data["sales"] < vendor_data["sales"].mean()]
-        if not low_sales.empty:
-            names = ", ".join(low_sales["vendor_name"].unique())
-            st.write(f"These vendors may need support: {names}.")
-        else:
-            st.write("No vendors are currently underperforming.")
-
-    else:
-        st.write("Try asking about sales, attendance, vendors, or at-risk vendors.")
-
-        st.header("Operations Dashboard")
-
-st.caption("Operational tracking of vendor performance, fees, and follow-up actions.")
-
+# ---------- OPERATIONS LOGIC ----------
 operations_df = vendor_data.copy()
 
-# Build logic from your original system
 operations_df["total_sales"] = operations_df["sales"] + operations_df.get("token_reimbursement", 0)
-operations_df["fee_due"] = operations_df["total_sales"] * 0.06
+operations_df["fee_due"] = operations_df["total_sales"] * SALES_FEE_RATE
 operations_df["balance_due"] = operations_df["fee_due"] - operations_df.get("paid_amount", 0)
 
 def action_needed(row):
@@ -245,16 +97,137 @@ def action_needed(row):
 
 operations_df["action_needed"] = operations_df.apply(action_needed, axis=1)
 
+open_followups = operations_df[operations_df["action_needed"] != "Complete"]
+
+# ============================================================
+# MARKET ASSISTANT
+# ============================================================
+
+st.markdown("<div class='wm-gold-card'>", unsafe_allow_html=True)
+st.header("Market Assistant")
+
+question = st.text_input("Ask a question about your market data:")
+
+if question:
+    question_lower = question.lower()
+
+    if "past due" in question_lower or "follow up" in question_lower or "follow-up" in question_lower or "need action" in question_lower:
+        if not open_followups.empty:
+            vendor_names = ", ".join(open_followups["vendor_name"].dropna().unique())
+            st.write(
+                f"There are {open_followups['vendor_name'].nunique()} vendor(s) needing follow-up: {vendor_names}."
+            )
+            st.dataframe(open_followups[["vendor_name", "market_date", "action_needed", "balance_due"]])
+        else:
+            st.write("No vendors are currently past due. All vendor records appear complete.")
+
+    elif "at risk" in question_lower or "underperform" in question_lower:
+        if not low_sales.empty:
+            names = ", ".join(low_sales["vendor_name"].dropna().unique())
+            st.write(f"These vendors may need support: {names}.")
+            st.dataframe(low_sales[["vendor_name", "sales"]])
+        else:
+            st.write("No vendors are currently underperforming.")
+
+    elif "sales" in question_lower:
+        st.write(f"Total recorded sales are ${total_sales:,.2f}.")
+
+    elif "attendance" in question_lower:
+        st.write(f"Estimated total attendance is {total_attendance:,.0f}.")
+
+    elif "vendors" in question_lower:
+        st.write(f"There are {vendor_count} unique vendors in the dataset.")
+
+    else:
+        st.write("Try asking about past due vendors, at-risk vendors, sales, attendance, or vendor count.")
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ============================================================
+# QUICK METRICS
+# ============================================================
+
+st.markdown("<div class='wm-card'>", unsafe_allow_html=True)
+st.header("Quick Metrics")
+
+col1, col2, col3 = st.columns(3)
+col1.metric("Total Vendor Sales", f"${total_sales:,.2f}")
+col2.metric("Estimated 6% Market Fees", f"${estimated_fees:,.2f}")
+col3.metric("Season-to-date Attendance", f"{total_attendance:,.0f}")
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ============================================================
+# NEXT MARKET PLANNING
+# ============================================================
+
+st.markdown("<div class='wm-card'>", unsafe_allow_html=True)
+st.header("Next Market Planning")
+
+expected_vendors = vendor_count
+weather_outlook = "Sunny"
+
+if expected_vendors > 25 and weather_outlook == "Sunny":
+    expected_attendance = "1,000+"
+else:
+    expected_attendance = "Moderate"
+
+col1, col2, col3 = st.columns(3)
+col1.metric("Expected Vendors", expected_vendors)
+col2.metric("Weather Outlook", weather_outlook)
+col3.metric("Expected Attendance", expected_attendance)
+
+st.caption(
+    "Insight: Vendor count and weather conditions drive expected attendance. "
+    "High vendor volume plus favorable weather suggests a strong market day."
+)
+
+if not low_sales.empty:
+    st.subheader("Vendors to Support This Week")
+    st.write("These vendors may benefit from marketing or placement support:")
+    st.dataframe(low_sales[["vendor_name", "sales"]])
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ============================================================
+# OPERATIONS DASHBOARD
+# ============================================================
+
+st.markdown("<div class='wm-gold-card'>", unsafe_allow_html=True)
+st.header("Operations Dashboard")
+
+st.caption("Operational tracking of vendor performance, fees, and follow-up actions.")
 st.dataframe(operations_df)
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ============================================================
+# INSIGHTS
+# ============================================================
+
+st.markdown("<div class='wm-card'>", unsafe_allow_html=True)
+st.header("Insights")
+
+if not low_sales.empty:
+    st.subheader("At-Risk Vendors")
+    st.write("These vendors are performing below average and may need support:")
+    st.dataframe(low_sales[["vendor_name", "sales"]])
+else:
+    st.success("No at-risk vendors right now.")
+
+if "weather_descriptor" in market_data.columns:
+    st.subheader("Weather Impact Insight")
+    weather_summary = market_data.groupby("weather_descriptor")["attendance_total"].mean()
+    st.write(weather_summary)
+    st.caption("Insight: Compare attendance across weather conditions to guide programming and vendor mix.")
+
+st.markdown("</div>", unsafe_allow_html=True)
 
 # ============================================================
 # DECISION LOOP: ATTENDANCE + PROGRAMMING INSIGHT
 # ============================================================
-# WHY:
-# This section shows the analytics loop:
-# observe attendance by time of day → identify a weak period →
-# recommend programming → measure whether attendance improves.
 
+st.markdown("<div class='wm-card'>", unsafe_allow_html=True)
 st.header("Decision Loop: Attendance + Programming")
 
 st.caption(
@@ -295,13 +268,13 @@ else:
         "Expected columns: attendance_830, attendance_930, attendance_1030, attendance_1130."
     )
 
+st.markdown("</div>", unsafe_allow_html=True)
+
 # ============================================================
 # VENDOR ROLE INTELLIGENCE
 # ============================================================
-# WHY:
-# The manager does not only think about vendors by category.
-# Some vendors are weekly staples, some drive traffic, and some add seasonal variety.
 
+st.markdown("<div class='wm-gold-card'>", unsafe_allow_html=True)
 st.header("Vendor Role Intelligence")
 
 vendor_roles = {
@@ -359,13 +332,13 @@ if "vendor_name" in vendor_data.columns:
     role_counts = active_role_df["vendor_role"].value_counts()
     st.bar_chart(role_counts)
 
+st.markdown("</div>", unsafe_allow_html=True)
+
 # ============================================================
 # WEATHER + PERFORMANCE ANALYSIS
 # ============================================================
-# WHY:
-# This connects weather → attendance → sales
-# to support hypothesis-driven decision making.
 
+st.markdown("<div class='wm-card'>", unsafe_allow_html=True)
 st.header("Weather + Performance Analysis")
 
 st.caption(
@@ -374,7 +347,6 @@ st.caption(
 )
 
 if "weather" in market_data.columns:
-
     weather_summary = market_data.groupby("weather").agg({
         "attendance_total": "mean"
     }).reset_index()
@@ -394,12 +366,11 @@ if "weather" in market_data.columns:
         st.subheader("Average Sales by Weather")
         st.dataframe(sales_summary)
 
-        st.subheader("Insight")
-
         if len(sales_summary) >= 2:
             best = sales_summary.sort_values("sales", ascending=False).iloc[0]
             worst = sales_summary.sort_values("sales").iloc[0]
 
+            st.subheader("Insight")
             st.write(
                 f"Hypothesis: {best['weather']} conditions drive higher vendor sales "
                 f"(${best['sales']:.2f}) compared to {worst['weather']} "
@@ -412,13 +383,14 @@ if "weather" in market_data.columns:
 
 else:
     st.info("Weather data not available yet.")
+
+st.markdown("</div>", unsafe_allow_html=True)
+
 # ============================================================
 # MANAGER SUMMARY
 # ============================================================
-# WHY:
-# This turns raw dashboard outputs into a short executive summary.
-# It helps the market manager quickly understand what needs attention.
 
+st.markdown("<div class='wm-gold-card'>", unsafe_allow_html=True)
 st.header("Manager Summary")
 
 summary_points = []
@@ -432,14 +404,12 @@ if not low_sales.empty:
         f"{low_sales['vendor_name'].nunique()} vendor(s) may need sales or marketing support."
     )
 
-if "action_needed" in operations_df.columns:
-    open_followups = operations_df[operations_df["action_needed"] != "Complete"]
-    if not open_followups.empty:
-        summary_points.append(
-            f"{len(open_followups)} vendor record(s) need follow-up."
-        )
-    else:
-        summary_points.append("All vendor records appear complete.")
+if not open_followups.empty:
+    summary_points.append(
+        f"{len(open_followups)} vendor record(s) need follow-up."
+    )
+else:
+    summary_points.append("All vendor records appear complete.")
 
 st.markdown("### Executive Readout")
 
@@ -450,3 +420,15 @@ st.caption(
     "This summary is generated from the dashboard data and is designed to support "
     "quick manager decision-making."
 )
+
+st.markdown("</div>", unsafe_allow_html=True)
+
+# ============================================================
+# DATA TABLES
+# ============================================================
+
+with st.expander("Show Raw Vendor Data"):
+    st.dataframe(vendor_data)
+
+with st.expander("Show Raw Market Data"):
+    st.dataframe(market_data)
