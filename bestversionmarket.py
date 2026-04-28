@@ -1402,12 +1402,40 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
         return audit_note + analyze_weather_impact(records)
 
     if "customer" in q or "attendance" in q:
-        total_customers = sum(estimate_customers(r) for r in records)
+    total_customers = sum(estimate_customers(r) for r in records)
+
+    if total_customers > 0:
         return (
             audit_note
             + f"The estimated total customer count is {total_customers}. "
             f"This estimate uses the market multiplier of {CUSTOMER_MULTIPLIER} applied to the timed attendance counts."
         )
+
+    context_records = load_market_day_context()
+    recent_markets = [r for r in context_records if r.estimated_customers > 0]
+
+    if recent_markets:
+        recent_markets = sorted(recent_markets, key=lambda r: r.market_date)[-5:]
+        avg_customers = sum(r.estimated_customers for r in recent_markets) / len(recent_markets)
+        low_customers = min(r.estimated_customers for r in recent_markets)
+        high_customers = max(r.estimated_customers for r in recent_markets)
+
+        return (
+            audit_note
+            + "No attendance data has been recorded yet for the upcoming market. "
+            "Because this market has not happened yet, I am switching from actual attendance counts "
+            "to recent-market context. "
+            f"Recent markets have ranged from {low_customers:,.0f} to {high_customers:,.0f} estimated customers, "
+            f"with an average of about {avg_customers:,.0f}. "
+            "Vendor participation, weather, and category mix should be watched closely for planning."
+        )
+
+    return (
+        audit_note
+        + "No attendance data has been recorded yet for the upcoming market, "
+        "and there is not enough historical attendance data to calculate a trend. "
+        "Use expected vendor participation, weather, and category mix as planning signals instead of treating the current count as zero."
+    )
 
     if "sales" in q or "revenue" in q:
         total_sales = sum(r.sales for r in records)
