@@ -878,7 +878,7 @@ def build_operations_table(records: list[VendorRecord]) -> str:
     """
     if not records:
         return "<p>No vendors have been entered yet.</p>"
-
+    records = sorted(records, key=lambda r: (r.market_date, r.vendor_name))
     rows = []
     for record in records:
         action_class = {
