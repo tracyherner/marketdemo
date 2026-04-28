@@ -1078,7 +1078,7 @@ def upcoming_market_insight(
         )
 
     return (
-        f"Planning insight: {scheduled_vendor_count} vendors are scheduled. No 1,000-customer benchmark is triggered yet, "
+        f"Planning insight: {scheduled_vendor_count} vendors are scheduled. Attendance is still below key benchmark thresholds, so turnout may be moderate. "
         f"and the current attendance signal is {performance_label}."
     )
 
@@ -1349,7 +1349,7 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
             return (
                 f"For the upcoming market on {next_market_date}, there are {vendor_count} scheduled vendors. "
                 f"{insight} "
-                "This provides a strong signal for staffing, vendor support, and customer experience planning. "
+                "At this level, attendance signals are still developing, so focus on vendor support, customer communication, and on-site experience. "
                 + audit_note
             )
 
