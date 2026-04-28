@@ -1317,12 +1317,16 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
     q = question.lower().strip()
     # --- Handle empty input ---
     if not q:
-        answer_text = "Please type a market operations question, such as, 'How many vendors are past due?'"
-        return answer_text + " " 
+        return "Please type a market operations question, such as, 'How many vendors are past due?'" = audit_note
+        
     # --- Intent detection ---
     is_upcoming_question = any(word in q for word in [
-    "upcoming", "next market", "this week", "prepare"
+    "upcoming", "next market", "this week", "prepare", "should i"
 ])
+    if is_upcoming_question:
+    # your upcoming logic
+    return "your upcoming answer..." + audit_note
+    
     # --- Precompute commonly used data ---
     underperforming = [r for r in records if r.is_underperforming]
     past_due = [r for r in records if r.action_needed != "Complete"]
