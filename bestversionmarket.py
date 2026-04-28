@@ -1312,7 +1312,6 @@ def math_audit_prefix(records: list[VendorRecord]) -> str:
 # ---------- BUILT-IN AGENT: QUESTION ANSWERING ----------
 
 def answer_agent_question(records: list[VendorRecord], question: str) -> str:
- 
     """Answer approved market-operations questions in full, readable sentences."""
 
     audit_note = math_audit_prefix(records)
@@ -1326,65 +1325,53 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
     missing_sales = [r for r in records if r.action_needed == "Send sales reminder"]
     payment_due = [r for r in records if r.action_needed == "Send payment reminder"]
 
-    is_upcoming_question = any(word in q for word in [
-        "upcoming", "next market", "this week", "prepare", "should i"
-    ])
-
-        if is_upcoming_question:
-        upcoming = get_upcoming_market_data()
-
-        if upcoming["has_schedule"]:
-            return (
-                f"For the upcoming market on {upcoming['next_market_key']}, "
-                f"there are {upcoming['vendor_count']} scheduled vendors. "
-                f"{upcoming['planning_insight']} "
-                "At this level, preparation should focus on vendor support, customer communication, "
-                "and maintaining a strong on-site experience. "
-                + audit_note
-            )
-
-        return "No upcoming market schedule is available, so preparation needs cannot be estimated yet. " + audit_note
-        return "No upcoming market schedule is available, so preparation needs cannot be estimated yet. " + audit_note
-        # --- Approved vendors ---
-    if "approved vendor" in q or "approved vendors" in q or "how many vendors are approved" in q:
+    # --- Approved vendors ---
+    if "approved" in q and "vendor" in q:
         refresh_approved_vendors()
         approved_count = len(APPROVED_VENDORS)
         return (
             f"There are {approved_count} approved vendors in the system. "
-            "This approved vendor list acts as the source of truth for vendor names and categories. "
+            "The approved vendor list acts as the source of truth for vendor names and categories. "
             + audit_note
         )
 
-    # --- Vendor sales performance ---
-    if "performance" in q and ("sales" in q or "vendor" in q or "vendors" in q):
-        if not records:
-            return "There is no vendor sales data available yet. " + audit_note
+    # --- Upcoming market / preparation ---
+    is_upcoming_question = any(word in q for word in [
+        "upcoming", "next market", "this week", "prepare", "should i"
+    ])
 
-        sales_by_vendor: dict[str, float] = defaultdict(float)
-        for r in records:
-            sales_by_vendor[r.vendor_name] += r.sales
+    if is_upcoming_question:
+        schedule = load_schedule()
+        context_by_date = market_context_lookup()
 
-        sorted_vendors = sorted(sales_by_vendor.items(), key=lambda item: item[1], reverse=True)
+        if schedule:
+            next_market_date = sorted(schedule.keys())[0]
+            scheduled_vendors = schedule.get(next_market_date, [])
+            vendor_count = len(scheduled_vendors)
 
-        top_vendors = sorted_vendors[:3]
-        bottom_vendors = sorted_vendors[-3:]
+            context = context_by_date.get(next_market_date)
+            weather_text = context.weather if context else "Not recorded"
 
-        top_text = ", ".join(
-            f"{name} ({format_currency(sales)})" for name, sales in top_vendors
-        )
+            expected = expected_customer_threshold(vendor_count, weather_text)
+            performance = attendance_performance_label(0, expected)
 
-        bottom_text = ", ".join(
-            f"{name} ({format_currency(sales)})" for name, sales in bottom_vendors
-        )
+            insight = upcoming_market_insight(
+                vendor_count,
+                weather_text,
+                "Weather.gov",
+                expected,
+                performance,
+            )
 
-        return (
-            f"Top sales performers are: {top_text}. "
-            f"Lower sales performers are: {bottom_text}. "
-            "This helps identify which vendors may need marketing support, placement review, or follow-up. "
-            + audit_note
-        )
+            return (
+                f"For the upcoming market on {next_market_date}, there are {vendor_count} scheduled vendors. "
+                f"{insight} "
+                + audit_note
+            )
 
-    # --- Upcoming market weather forecast / signal ---
+        return "No upcoming market schedule is available, so preparation needs cannot be estimated yet. " + audit_note
+
+    # --- Weather forecast / signal ---
     if "forecast" in q or ("weather" in q and "upcoming" in q):
         schedule = load_schedule()
         context_by_date = market_context_lookup()
@@ -1401,6 +1388,33 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
             )
 
         return "No upcoming market schedule is available, so I cannot identify a weather forecast signal yet. " + audit_note
+
+    # --- Vendor performance ---
+    if "performance" in q or "performing" in q:
+        if not records:
+            return "There is no vendor performance data available yet. " + audit_note
+
+        total_vendors = len({r.vendor_name for r in records})
+        total_sales = sum(r.sales for r in records)
+        underperforming_vendors = sorted({r.vendor_name for r in records if r.is_underperforming})
+        complete_records = [r for r in records if r.action_needed == "Complete"]
+        followup_records = [r for r in records if r.action_needed != "Complete"]
+
+        if underperforming_vendors:
+            underperforming_text = ", ".join(underperforming_vendors)
+        else:
+            underperforming_text = "none"
+
+        return (
+            f"Vendor performance right now shows {total_vendors} active vendor(s) in the records, "
+            f"with total recorded sales of {format_currency(total_sales)}. "
+            f"{len(underperforming_vendors)} vendor(s) are below category expectations: {underperforming_text}. "
+            f"{len(complete_records)} record(s) are complete, and {len(followup_records)} record(s) still need follow-up. "
+            "This gives the manager a quick view of sales performance, category expectations, and operational cleanup. "
+            + audit_note
+        )
+
+    # --- Underperforming vendors ---
     if "underperform" in q or "below" in q or "not meeting" in q:
         unique_vendors = sorted({r.vendor_name for r in underperforming})
         if not unique_vendors:
@@ -1413,6 +1427,7 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
             + audit_note
         )
 
+    # --- Follow-up needed ---
     if "past due" in q or "follow up" in q or "follow-up" in q or "need action" in q:
         unique_vendors = sorted({r.vendor_name for r in past_due})
         if not unique_vendors:
@@ -1421,22 +1436,21 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
         names = ", ".join(unique_vendors)
         return (
             f"There are {len(unique_vendors)} vendor(s) requiring follow-up: {names}. "
-            "This includes missing sales reports, outstanding payments, or both." 
+            "This includes missing sales reports, outstanding payments, or both. "
             + audit_note
         )
-    if "weather" in q or "forecast" in q:
-        return (
-        f"The forecast for the upcoming market is: {weather_text}. "
-        "This may impact attendance and vendor performance. "
-        + audit_note
-    )
-    if "report" in q and (
-    "missing" in q
-    or "not" in q
-    or "hasn't" in q
-    or "hasnt" in q
-    or "didn't" in q
-    or "did not" in q
+
+    # --- Missing sales reports ---
+    if (
+        "missing" in q
+        or "not reported" in q
+        or "hasn't reported" in q
+        or "hasnt reported" in q
+        or "has not reported" in q
+        or "didn't report" in q
+        or "did not report" in q
+        or "need to report" in q
+        or "still need to report" in q
     ):
         unique_vendors = sorted({r.vendor_name for r in missing_sales})
         if not unique_vendors:
@@ -1445,6 +1459,7 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
         names = ", ".join(unique_vendors)
         return f"There are {len(unique_vendors)} vendor(s) who still need to report sales: {names}. " + audit_note
 
+    # --- Payments ---
     if "payment" in q or "paid" in q or "owe" in q or "balance" in q:
         unique_vendors = sorted({r.vendor_name for r in payment_due})
         total_balance = sum(r.balance_due for r in payment_due)
@@ -1459,6 +1474,7 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
             + audit_note
         )
 
+    # --- Category mix ---
     if "category" in q or "breakdown" in q or "mix" in q:
         if not records:
             return "There is no vendor data available yet, so I cannot calculate a category breakdown. " + audit_note
@@ -1473,6 +1489,7 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
 
         return "Here is the current vendor category breakdown: " + "; ".join(parts) + ". " + audit_note
 
+    # --- Top vendor ---
     if "top" in q and ("vendor" in q or "selling" in q or "sales" in q):
         if not records:
             return "There is no sales data available yet, so I cannot identify a top-selling vendor. " + audit_note
@@ -1486,45 +1503,27 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
 
         return f"The top-selling vendor is {top_vendor}, with total recorded sales of {format_currency(top_sales)}. " + audit_note
 
+    # --- Decision loop ---
     if "decision loop" in q or "children" in q or "programming" in q or ("10" in q and "11" in q):
         return analyze_decision_loop() + " " + audit_note
 
+    # --- Weather impact ---
     if "weather" in q and ("impact" in q or "affect" in q or "influence" in q):
         return analyze_weather_impact(records) + " " + audit_note
 
+    # --- Attendance ---
     if "customer" in q or "attendance" in q:
         total_customers = sum(estimate_customers(r) for r in records)
 
         if total_customers > 0:
             return (
-                f"The estimated total customer count is {total_customers}, based on validated market attendance methodology."
+                f"The estimated total customer count is {total_customers}, based on validated market attendance methodology. "
                 + audit_note
             )
 
         return "No attendance data has been recorded yet for the upcoming market. " + audit_note
-if "performance" in q or "performing" in q:
-    if not records:
-        return "There is no vendor performance data available yet. " + audit_note
 
-    total_vendors = len({r.vendor_name for r in records})
-    underperforming_vendors = sorted({r.vendor_name for r in records if r.is_underperforming})
-    complete_records = [r for r in records if r.action_needed == "Complete"]
-    followup_records = [r for r in records if r.action_needed != "Complete"]
-    total_sales = sum(r.sales for r in records)
-
-    if underperforming_vendors:
-        underperforming_text = ", ".join(underperforming_vendors)
-    else:
-        underperforming_text = "none"
-
-    return (
-        f"Vendor performance right now shows {total_vendors} active vendor(s) in the records, "
-        f"with total recorded sales of {format_currency(total_sales)}. "
-        f"{len(underperforming_vendors)} vendor(s) are below category expectations: {underperforming_text}. "
-        f"{len(complete_records)} record(s) are complete, and {len(followup_records)} record(s) still need follow-up. "
-        "This gives the manager a quick view of sales performance, category expectations, and operational cleanup. "
-        + audit_note
-    )
+    # --- Sales ---
     if "sales" in q or "revenue" in q:
         total_sales = sum(r.sales for r in records)
         return f"Total recorded season sales are {format_currency(total_sales)}. " + audit_note
