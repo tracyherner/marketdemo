@@ -1371,18 +1371,28 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
 
         return "No upcoming market schedule is available, so preparation needs cannot be estimated yet. " + audit_note
 
-    # --- Weather forecast / signal ---
-    if "forecast" in q or ("weather" in q and "upcoming" in q):
+        # --- Weather forecast / signal ---
+    if "forecast" in q or "weather" in q:
         schedule = load_schedule()
-        context_by_date = market_context_lookup()
 
         if schedule:
-            next_market_date = sorted(schedule.keys())[0]
-            context = context_by_date.get(next_market_date)
-            weather_text = context.weather if context else "Not recorded"
+            today = date.today().isoformat()
+            future_dates = sorted([d for d in schedule.keys() if d >= today])
+
+            if future_dates:
+                next_market_date = future_dates[0]
+            else:
+                next_market_date = sorted(schedule.keys())[-1]
+
+            weather = fetch_weather_from_weather_gov()
+            forecast_text = weather.get("descriptor", "Forecast unavailable")
+            temperature = weather.get("temperature", "Temperature unavailable")
+            source = weather.get("source", "Weather source unavailable")
 
             return (
-                f"The weather signal for the upcoming market on {next_market_date} is: {weather_text}. "
+                f"The current forecast signal for the upcoming market on {next_market_date} is {forecast_text}, "
+                f"with a temperature of {temperature}. "
+                f"Source: {source}. "
                 "This should be considered when planning attendance expectations, vendor support, and customer communication. "
                 + audit_note
             )
