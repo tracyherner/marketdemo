@@ -1348,8 +1348,8 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
 
             return (
                 f"For the upcoming market on {next_market_date}, there are {vendor_count} scheduled vendors. "
-                f"{insight} "
-                "At this level, attendance signals are still developing, so focus on vendor support, customer communication, and on-site experience. "
+                "At this level, attendance signals are still developing and do not yet indicate a high-volume market. "
+                "This means preparation should focus on vendor support, customer communication, and maintaining a strong on-site experience rather than scaling for peak traffic. "
                 + audit_note
             )
 
