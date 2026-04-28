@@ -412,3 +412,41 @@ if "weather" in market_data.columns:
 
 else:
     st.info("Weather data not available yet.")
+# ============================================================
+# MANAGER SUMMARY
+# ============================================================
+# WHY:
+# This turns raw dashboard outputs into a short executive summary.
+# It helps the market manager quickly understand what needs attention.
+
+st.header("Manager Summary")
+
+summary_points = []
+
+summary_points.append(f"Total recorded vendor sales are ${total_sales:,.2f}.")
+summary_points.append(f"Estimated 6% market fees are ${estimated_fees:,.2f}.")
+summary_points.append(f"Season-to-date attendance is {total_attendance:,.0f}.")
+
+if not low_sales.empty:
+    summary_points.append(
+        f"{low_sales['vendor_name'].nunique()} vendor(s) may need sales or marketing support."
+    )
+
+if "action_needed" in operations_df.columns:
+    open_followups = operations_df[operations_df["action_needed"] != "Complete"]
+    if not open_followups.empty:
+        summary_points.append(
+            f"{len(open_followups)} vendor record(s) need follow-up."
+        )
+    else:
+        summary_points.append("All vendor records appear complete.")
+
+st.markdown("### Executive Readout")
+
+for point in summary_points:
+    st.write(f"- {point}")
+
+st.caption(
+    "This summary is generated from the dashboard data and is designed to support "
+    "quick manager decision-making."
+)
