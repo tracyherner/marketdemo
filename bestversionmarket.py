@@ -1619,19 +1619,22 @@ def next_saturday_from(today: date | None = None) -> date:
     return today + timedelta(days=days_until_saturday)
 
 
-def build_next_market_schedule_view(selected_category: str = "All") -> str:
-    """Build an expandable category schedule for the next Saturday market.
-
-    WHY: Managers need a quick view of who is scheduled next, first by total count,
-    then by category with vendor names underneath. The category filter keeps this flexible
-    without needing a separate produce-only section.
+def get_next_market_from_schedule(schedule: dict) -> date:
     """
-    schedule = load_schedule()
-    next_market = next_saturday_from()
-    next_market_key = next_market.isoformat()
-    scheduled_vendors = schedule.get(next_market_key, [])
-    context_by_date = market_context_lookup()
-    market_context = context_by_date.get(next_market_key)
+    Return the next market date that actually exists in the vendor schedule.
+
+    WHY: The dashboard should not guess the next Saturday if there is no vendor
+    schedule for that date. It should use the next scheduled market in the data.
+    """
+    today = date.today()
+
+    market_dates = sorted(date.fromisoformat(market_date) for market_date in schedule.keys())
+
+    future_market_dates = [market_date for market_date in market_dates if market_date >= today]
+
+    if future_market_dates:
+        return future_market_dates[0]
+    return market_dates[-1]
 
     # CHECK: For past markets, use recorded weather from market_day_context.csv.
     # For future markets, if recorded weather is missing, use the Weather.gov forecast.
