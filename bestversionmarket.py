@@ -1613,33 +1613,50 @@ def build_schedule_filter_options(selected_category: str = "All") -> str:
 
 # ---------- NEXT MARKET SCHEDULE VIEW ----------
 
-def next_saturday_from(today: date | None = None) -> date:
-    today = today or date.today()
-    days_until_saturday = (5 - today.weekday()) % 7
-    return today + timedelta(days=days_until_saturday)
+# ---------- NEXT MARKET SCHEDULE VIEW ----------
 
-
-def get_next_market_from_schedule(schedule: dict) -> date:
+def get_next_market_from_schedule(schedule: dict[str, list[str]]) -> date:
     """
     Return the next market date that actually exists in the vendor schedule.
 
-    WHY: The dashboard should not guess the next Saturday if there is no vendor
-    schedule for that date. It should use the next scheduled market in the data.
+    WHY: The dashboard should use the next scheduled market in the data,
+    not just guess the next Saturday.
     """
     today = date.today()
-
     market_dates = sorted(date.fromisoformat(market_date) for market_date in schedule.keys())
+
+    if not market_dates:
+        return today
 
     future_market_dates = [market_date for market_date in market_dates if market_date >= today]
 
     if future_market_dates:
         return future_market_dates[0]
+
     return market_dates[-1]
 
-    # CHECK: For past markets, use recorded weather from market_day_context.csv.
-    # For future markets, if recorded weather is missing, use the Weather.gov forecast.
-    # This lets the dashboard anticipate attendance instead of waiting for manual weather entry.
+
+def build_next_market_schedule_view(selected_category: str = "All") -> str:
+    """
+    Build an expandable category schedule for the next scheduled market.
+
+    WHY: Managers need a quick view of who is scheduled next, first by total count,
+    then by category with vendor names underneath.
+    """
+    schedule = load_schedule()
+
+    if not schedule:
+        return "<p class='note'>No vendor schedule is available yet.</p>"
+
+    next_market = get_next_market_from_schedule(schedule)
+    next_market_key = next_market.isoformat()
+    scheduled_vendors = schedule.get(next_market_key, [])
+
+    context_by_date = market_context_lookup()
+    market_context = context_by_date.get(next_market_key)
+
     forecast = fetch_weather_from_weather_gov()
+
     if market_context and market_context.weather != "Not recorded":
         weather_text = market_context.weather
         weather_source = "Recorded market context"
@@ -1649,22 +1666,9 @@ def get_next_market_from_schedule(schedule: dict) -> date:
 
     actual_customers = market_context.estimated_customers if market_context else 0
 
-    # If the generated sample schedule does not include the real current next Saturday,
-    # fall back to the first available schedule date so the demo still shows something.
-    if not scheduled_vendors and schedule:
-        next_market_key = sorted(schedule.keys())[0]
-        scheduled_vendors = schedule.get(next_market_key, [])
-        market_context = context_by_date.get(next_market_key)
-        if market_context and market_context.weather != "Not recorded":
-            weather_text = market_context.weather
-            weather_source = "Recorded market context"
-        else:
-            weather_text = forecast.get("descriptor", "Not recorded")
-            weather_source = "Weather.gov forecast"
-        actual_customers = market_context.estimated_customers if market_context else 0
-
     expected_customers = expected_customer_threshold(len(scheduled_vendors), weather_text)
     performance_label = attendance_performance_label(actual_customers, expected_customers)
+
     planning_insight = upcoming_market_insight(
         scheduled_vendor_count=len(scheduled_vendors),
         weather_text=weather_text,
@@ -1674,14 +1678,20 @@ def get_next_market_from_schedule(schedule: dict) -> date:
     )
 
     vendors_by_category: dict[str, list[str]] = defaultdict(list)
+
     for vendor_name in scheduled_vendors:
         category = APPROVED_VENDORS.get(vendor_name, "Other")
         if selected_category == "All" or category == selected_category:
             vendors_by_category[category].append(vendor_name)
 
     category_cards = []
+
     for category in sorted(vendors_by_category):
-        vendor_items = "".join(f"<li>{html.escape(vendor)}</li>" for vendor in sorted(vendors_by_category[category]))
+        vendor_items = "".join(
+            f"<li>{html.escape(vendor)}</li>"
+            for vendor in sorted(vendors_by_category[category])
+        )
+
         category_cards.append(
             "<details class='category-details'>"
             f"<summary>{html.escape(category)} ({len(vendors_by_category[category])})</summary>"
@@ -1690,11 +1700,12 @@ def get_next_market_from_schedule(schedule: dict) -> date:
         )
 
     if not category_cards:
-        category_cards.append("<p class='note'>No vendors are scheduled for the next market date yet.</p>")
+        category_cards.append("<p class='note'>No vendors are scheduled for the selected category.</p>")
 
     return f"""
     <p class="note"><strong>{html.escape(planning_insight)}</strong></p>
     <p class="note">Next market date: <strong>{html.escape(next_market_key)}</strong></p>
+
     <form method="get" action="/#schedule-section" class="agent-question-form">
       <label>Filter by vendor type
         <select name="schedule_category">
@@ -1703,6 +1714,7 @@ def get_next_market_from_schedule(schedule: dict) -> date:
       </label>
       <button type="submit">Apply Filter</button>
     </form>
+
     <div class="season-grid">
       <div class="season-stat"><div class="kpi-label">Scheduled Vendors Shown</div><div class="kpi-value">{sum(len(vendors) for vendors in vendors_by_category.values())}</div></div>
       <div class="season-stat"><div class="kpi-label">Categories Represented</div><div class="kpi-value">{len(vendors_by_category)}</div></div>
@@ -1714,11 +1726,10 @@ def get_next_market_from_schedule(schedule: dict) -> date:
       <div class="season-stat"><div class="kpi-label">Actual / Estimated Customers</div><div class="kpi-value">{actual_customers}</div></div>
       <div class="season-stat"><div class="kpi-label">Attendance Signal</div><div class="kpi-value">{html.escape(performance_label)}</div></div>
     </div>
+
     <p class="note">Click each category to see which vendors are scheduled under that category. Current filter: <strong>{html.escape(selected_category)}</strong>.</p>
     {''.join(category_cards)}
     """
-
-
 # ---------- DASHBOARD RENDERING ----------
 
 def build_dashboard_html(records: list[VendorRecord], flash_message: str = "", agent_question: str = "", agent_answer: str = "", schedule_category: str = "All") -> str:
