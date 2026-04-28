@@ -1442,7 +1442,29 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
             )
 
         return "No attendance data has been recorded yet for the upcoming market. " + audit_note
+if "performance" in q or "performing" in q:
+    if not records:
+        return "There is no vendor performance data available yet. " + audit_note
 
+    total_vendors = len({r.vendor_name for r in records})
+    underperforming_vendors = sorted({r.vendor_name for r in records if r.is_underperforming})
+    complete_records = [r for r in records if r.action_needed == "Complete"]
+    followup_records = [r for r in records if r.action_needed != "Complete"]
+    total_sales = sum(r.sales for r in records)
+
+    if underperforming_vendors:
+        underperforming_text = ", ".join(underperforming_vendors)
+    else:
+        underperforming_text = "none"
+
+    return (
+        f"Vendor performance right now shows {total_vendors} active vendor(s) in the records, "
+        f"with total recorded sales of {format_currency(total_sales)}. "
+        f"{len(underperforming_vendors)} vendor(s) are below category expectations: {underperforming_text}. "
+        f"{len(complete_records)} record(s) are complete, and {len(followup_records)} record(s) still need follow-up. "
+        "This gives the manager a quick view of sales performance, category expectations, and operational cleanup. "
+        + audit_note
+    )
     if "sales" in q or "revenue" in q:
         total_sales = sum(r.sales for r in records)
         return f"Total recorded season sales are {format_currency(total_sales)}. " + audit_note
