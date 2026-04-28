@@ -1288,18 +1288,16 @@ def audit_vendor_math(records: list[VendorRecord]) -> list[str]:
 
 
 def math_audit_prefix(records: list[VendorRecord]) -> str:
-    """Create a short plain-English audit note for agent answers.
-
-    WHY: This makes it clear that answers are based on checked calculations.
-    """
+    """Create a short plain-English audit note for agent answers."""
     issues = audit_vendor_math(records)
-    if not issues:
-        return "I checked the vendor math first. Sales, fees, balances, payments, and customer-count calculations look consistent. "
 
-    preview = "; ".join(issues[:3])
-    extra = "" if len(issues) <= 3 else f" There are {len(issues) - 3} additional issue(s)."
+    if not issues:
+        return "Data check passed. "
+
+    preview = "; ".join(issues[:2])
+    extra = "" if len(issues) <= 2 else f" Plus {len(issues) - 2} more issue(s)."
     return (
-        "I checked the vendor math first and found data-quality issue(s) that may affect the answer: "
+        "Data check flagged possible issue(s): "
         f"{preview}.{extra} "
     )
 
