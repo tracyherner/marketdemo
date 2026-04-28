@@ -1330,36 +1330,20 @@ def answer_agent_question(records: list[VendorRecord], question: str) -> str:
         "upcoming", "next market", "this week", "prepare", "should i"
     ])
 
-    if is_upcoming_question:
-        schedule = load_schedule()
-        context_by_date = market_context_lookup()
+        if is_upcoming_question:
+        upcoming = get_upcoming_market_data()
 
-        if schedule:
-            next_market_date = get_next_market_from_schedule(schedule).isoformat()
-            scheduled_vendors = schedule.get(next_market_date, [])
-            vendor_count = len(scheduled_vendors)
-
-            context = context_by_date.get(next_market_date)
-            weather_text = context.weather if context else "Not recorded"
-
-            expected = expected_customer_threshold(vendor_count, weather_text)
-            performance = attendance_performance_label(0, expected)
-
-            insight = upcoming_market_insight(
-                vendor_count,
-                weather_text,
-                "Weather.gov",
-                expected,
-                performance,
-            )
-
+        if upcoming["has_schedule"]:
             return (
-                f"For the upcoming market on {next_market_date}, there are {vendor_count} scheduled vendors. "
-                f"{insight} "
-                "At this level, attendance signals are still developing, so preparation should focus on vendor support, customer communication, and maintaining a strong on-site experience rather than scaling for peak traffic. "
+                f"For the upcoming market on {upcoming['next_market_key']}, "
+                f"there are {upcoming['vendor_count']} scheduled vendors. "
+                f"{upcoming['planning_insight']} "
+                "At this level, preparation should focus on vendor support, customer communication, "
+                "and maintaining a strong on-site experience. "
                 + audit_note
             )
 
+        return "No upcoming market schedule is available, so preparation needs cannot be estimated yet. " + audit_note
         return "No upcoming market schedule is available, so preparation needs cannot be estimated yet. " + audit_note
 
     if "underperform" in q or "below" in q or "not meeting" in q:
